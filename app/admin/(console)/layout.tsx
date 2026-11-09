@@ -13,7 +13,6 @@ const navigation = [
   { href: "/admin/events", label: "Events & tickets", icon: CalendarDays },
   { href: "/admin/orders", label: "Ticket buyers", icon: Ticket },
   { href: "/admin/password", label: "Change password", icon: KeyRound },
-  { href: "/admin/password", label: "Change password", icon: KeyRound },
 ];
 
 export default function AdminLayout({ children }: { children: ReactNode }) {

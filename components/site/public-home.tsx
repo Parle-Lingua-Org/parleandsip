@@ -25,12 +25,14 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/compone
 import { Input } from "@/components/ui/input";
 import { formatNaira, type EventItem } from "@/lib/site-data";
 import { useSiteStore } from "@/lib/site-store";
+import Image from "next/image";
+import LogoUse from "@/app/logo.webp";
 
 const categoryOptions = ["All experiences", "French conversation", "Francophone culture", "Art & creativity", "Food & gastronomy", "Games & conversation"];
 const areaOptions = ["All Lagos", "Yaba", "Victoria Island", "Ikeja", "Ikoyi", "Lekki"];
 
 export function PublicHome() {
-  const { data, addOrder } = useSiteStore();
+  const { data } = useSiteStore();
   const { content } = data;
   const [category, setCategory] = useState("All experiences");
   const [area, setArea] = useState("All Lagos");
@@ -44,6 +46,8 @@ export function PublicHome() {
   const [buyerEmail, setBuyerEmail] = useState("");
   const [orderComplete, setOrderComplete] = useState(false);
   const [orderError, setOrderError] = useState("");
+  const [checkoutUrl, setCheckoutUrl] = useState("");
+  const [checkoutBusy, setCheckoutBusy] = useState(false);
 
   const featuredEvent = data.events.find((event) => event.id === content.featuredEventId) ?? data.events[0];
   const visibleEvents = data.events.filter((event) => {
@@ -72,27 +76,39 @@ export function PublicHome() {
     setBuyerEmail("");
     setOrderComplete(false);
     setOrderError("");
+    setCheckoutUrl("");
   }
 
-  function submitDemoOrder(event: React.FormEvent<HTMLFormElement>) {
+  async function submitCheckout(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!selectedEvent) return;
     if (!selectedTier || quantity > selectedTierRemaining) {
       setOrderError("That ticket type has sold out. Choose another option.");
       return;
     }
-    addOrder({
-      id: crypto.randomUUID(),
-      eventId: selectedEvent.id,
-      eventTitle: selectedEvent.title,
-      buyerName: buyerName.trim(),
-      buyerEmail: buyerEmail.trim(),
-      ticketType: selectedTier?.name ?? "General admission",
-      quantity,
-      total: ticketPrice * quantity,
-      purchasedAt: new Date().toISOString(),
-    });
-    setOrderComplete(true);
+    setCheckoutBusy(true);
+    setOrderError("");
+    try {
+      const response = await fetch("/api/paystack/initialize", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          eventSlug: selectedEvent.id,
+          buyerName: buyerName.trim(),
+          buyerEmail: buyerEmail.trim(),
+          items: [{ name: selectedTier.name, quantity }],
+        }),
+      });
+      const result = await response.json() as { authorizationUrl?: string; error?: string };
+      if (!response.ok || !result.authorizationUrl) throw new Error(result.error ?? "Unable to open Paystack checkout.");
+      setCheckoutUrl(result.authorizationUrl);
+      setOrderComplete(true);
+      window.location.assign(result.authorizationUrl);
+    } catch (reason) {
+      setOrderError(reason instanceof Error ? reason.message : "Unable to start checkout. Please try again.");
+    } finally {
+      setCheckoutBusy(false);
+    }
   }
 
   return (
@@ -103,8 +119,35 @@ export function PublicHome() {
       </div>
 
       <header className="relative z-20 flex h-[68px] items-center gap-8 border-b-2 border-foreground px-4 sm:px-8 lg:px-[max(2rem,calc((100vw-1200px)/2))]">
-          <a className="flex shrink-0 items-center gap-2 text-xl font-bold tracking-tight" href="#top" aria-label={`${content.brandName} home`}>
-          {content.logoImage ? <img src={content.logoImage} alt="" className="size-8 border-2 border-foreground object-cover" /> : <span className="grid size-8 place-items-center border-2 border-foreground bg-primary"><Languages size={19} /></span>}{content.brandName}<span className="text-accent">.</span>
+        {/* <a className="flex shrink-0 items-center gap-2 text-xl font-bold tracking-tight" href="#top" aria-label={`${content.brandName} home`}>
+          {content.logoImage ? <img src={content.logoImage} alt="" className="size-8 border-2 border-foreground object-cover" /> : <span className="grid size-8 place-items-center border-2 border-foreground bg-primary"><img src={LogoUse} alt="" /></span>}{content.brandName}<span className="text-accent">.</span>
+        </a> */}
+        <a
+          className="flex shrink-0 items-center gap-2 text-xl font-bold tracking-tight"
+          href="#top"
+          aria-label={`${content.brandName} home`}
+        >
+          {content.logoImage ? (
+            <img
+              src={content.logoImage}
+              alt=""
+              className="size-8 border-2 border-foreground object-cover"
+            />
+          ) : (
+            <span className="grid size-8 place-items-center">
+              <Image
+                src={LogoUse}
+                alt=""
+                width={32}
+                height={32}
+                className="object-contain"
+                priority
+              />
+            </span>
+          )}
+
+          {content.brandName}
+          <span className="text-accent">.</span>
         </a>
         <button className="ml-auto grid size-9 place-items-center border-2 border-foreground bg-primary md:hidden" type="button" aria-label={menuOpen ? "Close navigation" : "Open navigation"} onClick={() => setMenuOpen((open) => !open)}>
           {menuOpen ? <X size={19} /> : <Menu size={19} />}
@@ -203,14 +246,14 @@ export function PublicHome() {
         </footer>
       </div>
 
-      <Dialog open={Boolean(selectedEvent)} onOpenChange={(open) => { if (!open) { setSelectedEvent(null); setOrderComplete(false); } }}>
+      <Dialog open={Boolean(selectedEvent)} onOpenChange={(open) => { if (!open) { setSelectedEvent(null); setOrderComplete(false); setCheckoutUrl(""); } }}>
         {selectedEvent && <DialogContent className="p-0">
           <div className="relative h-36 border-b-2 border-foreground bg-cover bg-center" style={{ backgroundImage: `linear-gradient(0deg,rgb(var(--dap-overlay-rgb)/.7),transparent 80%),url("${eventImages[selectedImageIndex] ?? selectedEvent.image}")` }}><p className="absolute bottom-3 left-4 font-mono text-[9px] text-card">{selectedEvent.date} · {selectedEvent.time}</p></div>
           {!orderComplete && eventImages.length > 1 && <div className="flex gap-2 overflow-x-auto border-b border-dap-border-muted p-3">{eventImages.map((image, index) => <button key={`${image.slice(0, 30)}-${index}`} type="button" aria-label={`View event photo ${index + 1}`} aria-pressed={selectedImageIndex === index} onClick={() => setSelectedImageIndex(index)} className={`size-14 shrink-0 border-2 bg-cover bg-center ${selectedImageIndex === index ? "border-foreground shadow-[2px_2px_0_var(--foreground)]" : "border-dap-border-muted"}`} style={{ backgroundImage: `url("${image}")` }} />)}</div>}
           {orderComplete ? <div className="p-5 text-center sm:p-6">
-            <span className="mx-auto grid size-11 place-items-center border-2 border-foreground bg-primary"><Ticket size={21} /></span><p className="mt-4 font-mono text-[9px] text-muted-foreground">DEMO TICKET</p><DialogTitle className="mt-1 text-2xl font-bold">You&apos;re on the list.</DialogTitle><DialogDescription className="mx-auto mt-2 max-w-xs text-xs leading-5 text-muted-foreground">{quantity} {selectedTier?.name.toLowerCase() ?? "ticket"} {quantity === 1 ? "is" : "are"} saved for {selectedEvent.title}. No payment was collected.</DialogDescription>
-            <div className="my-5 flex justify-between border-y border-dap-border-muted py-3 text-sm"><span>Demo total</span><strong>{formatNaira(ticketPrice * quantity)}</strong></div><Button className="w-full" onClick={() => { setSelectedEvent(null); setOrderComplete(false); }}>Done <ArrowRight size={15} /></Button>
-          </div> : <form className="space-y-4 p-4 sm:p-5" onSubmit={submitDemoOrder}>
+            <span className="mx-auto grid size-11 place-items-center border-2 border-foreground bg-primary"><Ticket size={21} /></span><p className="mt-4 font-mono text-[9px] text-muted-foreground">SECURE PAYSTACK CHECKOUT</p><DialogTitle className="mt-1 text-2xl font-bold">Complete your booking.</DialogTitle><DialogDescription className="mx-auto mt-2 max-w-xs text-xs leading-5 text-muted-foreground">Your ticket is reserved while Paystack confirms payment. We&apos;ll email the QR ticket after confirmation.</DialogDescription>
+            <div className="my-5 flex justify-between border-y border-dap-border-muted py-3 text-sm"><span>Order total</span><strong>{formatNaira(ticketPrice * quantity)}</strong></div><Button asChild className="w-full"><a href={checkoutUrl}>Continue to Paystack <ArrowRight size={15} /></a></Button>
+          </div> : <form className="space-y-4 p-4 sm:p-5" onSubmit={submitCheckout}>
             <div><p className="font-mono text-[8px] uppercase text-muted-foreground">{selectedEvent.category} · {selectedEvent.area}</p><DialogTitle className="mt-1 pr-9 text-xl font-bold leading-tight">{selectedEvent.title}</DialogTitle><DialogDescription className="mt-1 flex items-center gap-1 text-[10px] text-muted-foreground"><MapPin size={13} />{selectedEvent.venue}</DialogDescription></div>
             <fieldset><legend className="mb-2 font-mono text-[8px] text-muted-foreground">PICK YOUR PASS</legend><div className="grid gap-2">
               {selectedEvent.ticketTiers.map((tier) => { const remaining = remainingForTier(selectedEvent, tier.id); return <button key={tier.id} type="button" disabled={remaining === 0} aria-pressed={selectedTier?.id === tier.id} onClick={() => { setSelectedTierId(tier.id); setQuantity((count) => Math.min(count, Math.max(remaining, 1))); setOrderError(""); }} className={`flex min-h-14 items-center gap-3 border-2 px-3 text-left disabled:cursor-not-allowed disabled:opacity-50 ${selectedTier?.id === tier.id ? "border-foreground bg-success shadow-[2px_2px_0_var(--foreground)]" : "border-dap-border-muted bg-card"}`}><span className="grid size-4 place-items-center rounded-full border border-foreground">{selectedTier?.id === tier.id && <span className="size-2 rounded-full bg-foreground" />}</span><span className="flex-1"><strong className="block text-[10px]">{tier.name}</strong><small className="text-[9px] text-muted-foreground">{tier.description} · {remaining ? `${remaining} left` : "Sold out"}</small></span><strong className="text-xs">{formatNaira(tier.price)}</strong></button>; })}
@@ -219,8 +262,8 @@ export function PublicHome() {
             <div className="grid gap-3 sm:grid-cols-2"><label className="grid gap-1 text-[10px] font-semibold">Your name <Input autoComplete="name" required value={buyerName} onChange={(event) => setBuyerName(event.target.value)} /></label><label className="grid gap-1 text-[10px] font-semibold">Email for your ticket <Input autoComplete="email" type="email" required value={buyerEmail} onChange={(event) => setBuyerEmail(event.target.value)} /></label></div>
             <div className="flex items-center justify-between text-xs"><span>Total <small className="text-[9px] text-muted-foreground"> · fees at checkout</small></span><strong className="text-base">{formatNaira(ticketPrice * quantity)}</strong></div>
             {orderError && <p role="alert" className="text-[10px] text-accent-foreground">{orderError}</p>}
-            <Button className="w-full" type="submit" disabled={selectedTierRemaining === 0}>{selectedTierRemaining ? "Reserve tickets" : "Sold out"} <ArrowRight size={15} /></Button>
-            <p className="text-center text-[8px] text-muted-foreground">Frontend demo only · no payment collected</p>
+            <Button className="w-full" type="submit" disabled={selectedTierRemaining === 0 || checkoutBusy}>{checkoutBusy ? "Opening Paystack…" : selectedTierRemaining ? "Continue to Paystack" : "Sold out"} <ArrowRight size={15} /></Button>
+            <p className="text-center text-[8px] text-muted-foreground">Secure hosted payment · ticket QR emailed after confirmation</p>
           </form>}
         </DialogContent>}
       </Dialog>
