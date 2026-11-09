@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
-import "./globals.css";
+import { SiteDataProvider } from "@/lib/site-store";
+import "./theme.css";
 
 export const metadata: Metadata = {
-  title: "Sidequest | Find your next favorite game",
-  description: "A home for the games you haven't played yet.",
+  title: "Parle & Sip | French, culture & connection",
+  description: "French, Francophone culture, creativity and connection. Learn. Connect. Experience. Parlez et profitez !",
 };
 
 export default function RootLayout({
@@ -13,7 +14,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        <SiteDataProvider>{children}</SiteDataProvider>
+      </body>
     </html>
   );
 }
