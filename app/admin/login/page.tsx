@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
+import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, ArrowRight, Languages, LockKeyhole } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -8,28 +8,28 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useSiteStore } from "@/lib/site-store";
 
-const demoEmail = "admin@parleandsip.local";
-const demoPassword = "parle-demo";
-
 export default function AdminLoginPage() {
   const router = useRouter();
   const { data } = useSiteStore();
-  const [email, setEmail] = useState(demoEmail);
-  const [password, setPassword] = useState(demoPassword);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
 
-  useEffect(() => {
-    if (sessionStorage.getItem("dap-admin-session") === "active") router.replace("/admin");
-  }, [router]);
-
-  function signIn(event: FormEvent<HTMLFormElement>) {
+  async function signIn(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (email.trim().toLowerCase() !== demoEmail || password !== demoPassword) {
-      setError("Those demo credentials did not match.");
-      return;
+    setError("");
+    setBusy(true);
+    try {
+      const response = await fetch("/api/admin/login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email: email.trim(), password }) });
+      const result = await response.json() as { error?: string };
+      if (!response.ok) throw new Error(result.error ?? "Sign-in failed.");
+      router.replace("/admin");
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Unable to sign in. Check your Supabase configuration.");
+    } finally {
+      setBusy(false);
     }
-    sessionStorage.setItem("dap-admin-session", "active");
-    router.replace("/admin");
   }
 
   return (
@@ -43,7 +43,7 @@ export default function AdminLoginPage() {
         <div className="flex items-center justify-between"><a className="flex items-center gap-2 text-lg font-bold lg:hidden" href="/">{data.content.logoImage ? <img src={data.content.logoImage} alt="" className="size-8 border-2 border-foreground object-cover" /> : <span className="grid size-8 place-items-center border-2 border-foreground bg-primary"><Languages size={18} /></span>}{data.content.brandName}<span className="text-accent">.</span></a><a className="ml-auto flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground" href="/"><ArrowLeft size={14} /> Back to site</a></div>
         <div className="mx-auto w-full max-w-sm py-12">
           <div className="mb-6 grid size-12 place-items-center border-2 border-foreground bg-secondary"><LockKeyhole size={21} /></div>
-          <p className="font-mono text-[9px] tracking-wider text-muted-foreground">ADMIN ACCESS · DEMO ONLY</p>
+          <p className="font-mono text-[9px] tracking-wider text-muted-foreground">SUPABASE AUTH · ADMIN ACCESS</p>
           <h2 className="mt-2 text-3xl font-bold tracking-tight">Welcome back.</h2>
           <p className="mt-2 text-xs leading-5 text-muted-foreground">Sign in to manage Parle & Sip experiences and community.</p>
           <Card className="mt-7 p-5 shadow-[4px_4px_0_var(--foreground)]">
@@ -51,11 +51,10 @@ export default function AdminLoginPage() {
               <label className="grid gap-1.5 text-xs font-semibold">Email <Input type="email" autoComplete="username" required value={email} onChange={(event) => setEmail(event.target.value)} /></label>
               <label className="grid gap-1.5 text-xs font-semibold">Password <Input type="password" autoComplete="current-password" required value={password} onChange={(event) => setPassword(event.target.value)} /></label>
               {error && <p role="alert" className="border-2 border-accent bg-accent/20 p-2 text-xs">{error}</p>}
-              <Button type="submit" className="mt-1 w-full">Sign in <ArrowRight size={15} /></Button>
+              <Button type="submit" disabled={busy} className="mt-1 w-full">{busy ? "Signing in…" : "Sign in"} <ArrowRight size={15} /></Button>
             </form>
-            <div className="mt-5 border-t border-dap-border-muted pt-4"><p className="font-mono text-[8px] text-muted-foreground">DEMO CREDENTIALS</p><p className="mt-1 text-[10px]">{demoEmail} <span className="px-1 text-muted-foreground">/</span> {demoPassword}</p></div>
           </Card>
-          <p className="mt-5 text-center text-[9px] leading-4 text-muted-foreground">Frontend demo only. Authentication is stored in this browser session and is not secure for production.</p>
+          <p className="mt-5 text-center text-[9px] leading-4 text-muted-foreground">Create the account in Supabase Auth, then assign its profile the admin role. Passwords are managed by Supabase Auth.</p>
         </div>
         <p className="font-mono text-[8px] tracking-wide text-muted-foreground">PARLE & SIP ADMIN · V1.0</p>
       </section>

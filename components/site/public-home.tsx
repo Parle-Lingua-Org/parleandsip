@@ -157,7 +157,7 @@ export function PublicHome() {
             <a className="mt-3 inline-flex items-center gap-1.5 text-[9px] font-semibold" href="#events">See all meetups <ArrowRight size={13} /></a>
           </Card>
 
-          <Card id="community" className="flex min-h-[170px] flex-col items-start bg-accent p-4 shadow-[4px_4px_0_var(--foreground)] md:col-span-2 xl:col-span-6">
+          <Card id="community" className="flex min-h-[170px] flex-col items-start bg-primary p-4 text-primary-foreground shadow-[4px_4px_0_var(--foreground)] md:col-span-2 xl:col-span-6">
             <span className="font-mono text-[8px] tracking-wide">02 / YOUR KIND OF PEOPLE</span>
             <div className="mt-3 flex -space-x-1.5" aria-hidden="true"><span className="grid size-7 place-items-center rounded-full border border-foreground bg-dap-avatar text-[9px] font-bold">F</span><span className="grid size-7 place-items-center rounded-full border border-foreground bg-primary text-[9px] font-bold">C</span><span className="grid size-7 place-items-center rounded-full border border-foreground bg-dap-blue text-[9px] font-bold">A</span><span className="grid size-7 place-items-center rounded-full border border-foreground bg-foreground text-[9px] font-bold text-card">+</span></div>
             <strong className="mt-2 max-w-lg text-xl leading-tight">{content.communityTitle}</strong>
@@ -199,7 +199,7 @@ export function PublicHome() {
         <footer className="mt-10 flex min-h-20 flex-wrap items-center gap-3 border-t-2 border-foreground py-4">
           <a className="flex items-center gap-2 text-lg font-bold" href="#top">{content.logoImage ? <img src={content.logoImage} alt="" className="size-7 border-2 border-foreground object-cover" /> : <span className="grid size-7 place-items-center border-2 border-foreground bg-primary"><Languages size={16} /></span>}{content.brandName}<span className="text-accent">.</span></a>
           <p className="font-serif text-xs italic text-muted-foreground">{content.footerText}</p>
-          <span className="ml-auto text-right font-mono text-[8px] tracking-wide text-muted-foreground">{content.footerLocation} <span className="px-1 text-accent">●</span> {content.footerCurrency} <a className="ml-2 underline" href="/admin/login">ADMIN</a></span>
+          <span className="ml-auto text-right font-mono text-[8px] tracking-wide text-muted-foreground">{content.footerLocation} <span className="px-1 text-accent">●</span> {content.footerCurrency}</span>
         </footer>
       </div>
 

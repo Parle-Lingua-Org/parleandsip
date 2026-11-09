@@ -62,9 +62,24 @@ function readSavedData(): SiteData {
       "translation-jam": "Translation Jam: Music & Meaning",
       "igbo-conversation": "Igbo Conversation Corner",
     };
+    const theme = { ...initialSiteData.theme, ...parsed.theme };
+    const previousDefaultTheme: SiteTheme = {
+      background: "#f3f1e8",
+      foreground: "#171815",
+      primary: "#c8f36b",
+      secondary: "#e4e9d8",
+      muted: "#e7e5db",
+      mutedForeground: "#686c63",
+      accent: "#ff8064",
+      ring: "#4a6828",
+      info: "#d9e3fa",
+    };
+    for (const key of Object.keys(previousDefaultTheme) as Array<keyof SiteTheme>) {
+      if (parsed.theme?.[key] === previousDefaultTheme[key]) theme[key] = initialSiteData.theme[key];
+    }
     return {
       content,
-      theme: { ...initialSiteData.theme, ...parsed.theme },
+      theme,
       events: savedEvents.map((event, index) => {
         const fallback = initialSiteData.events.find((item) => item.id === event.id) ?? initialSiteData.events[index];
         const id = event.id ?? fallback?.id ?? `event-${index + 1}`;

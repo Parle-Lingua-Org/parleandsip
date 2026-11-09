@@ -24,7 +24,7 @@ const themeFields: { key: keyof SiteTheme; label: string; note: string }[] = [
 ];
 
 const palettePresets: { name: string; mood: string; colors: Pick<SiteTheme, "background" | "foreground" | "primary" | "secondary" | "muted" | "mutedForeground" | "accent" | "ring" | "info"> }[] = [
-  { name: "Parle & Sip citrus", mood: "Current Parle & Sip palette", colors: { background: "#f3f1e8", foreground: "#171815", primary: "#c8f36b", secondary: "#e4e9d8", muted: "#e7e5db", mutedForeground: "#686c63", accent: "#ff8064", ring: "#4a6828", info: "#d9e3fa" } },
+  { name: "Parle & Sip rouge", mood: "Navy, red, a touch of gold", colors: { background: "#f5f6f8", foreground: "#192637", primary: "#9a1f26", secondary: "#e5e9ef", muted: "#edf0f4", mutedForeground: "#526173", accent: "#be8f3f", ring: "#9a1f26", info: "#dce4ef" } },
   { name: "Atlantic", mood: "Cool lagoon + coral", colors: { background: "#eff6f2", foreground: "#173334", primary: "#70ddc6", secondary: "#d2e8df", muted: "#e2eee8", mutedForeground: "#526865", accent: "#fb8866", ring: "#17685f", info: "#cce2f1" } },
   { name: "Market day", mood: "Papaya + marigold", colors: { background: "#f6efe3", foreground: "#2c2118", primary: "#f5c957", secondary: "#e9dcc6", muted: "#eee5d7", mutedForeground: "#746556", accent: "#ef7559", ring: "#8a5228", info: "#d7e2ee" } },
   { name: "Night market", mood: "Electric leaf + sky", colors: { background: "#eaf0ec", foreground: "#13252a", primary: "#b9e86a", secondary: "#cfe0df", muted: "#dfe9e6", mutedForeground: "#53676a", accent: "#ff795c", ring: "#286171", info: "#c1dce8" } },

@@ -3,7 +3,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { CalendarDays, Eye, LayoutDashboard, LogOut, Palette, Ticket, UsersRound } from "lucide-react";
+import { CalendarDays, Eye, KeyRound, LayoutDashboard, LogOut, Palette, Ticket, UsersRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useSiteStore } from "@/lib/site-store";
 
@@ -12,6 +12,8 @@ const navigation = [
   { href: "/admin/content", label: "Site content", icon: Palette },
   { href: "/admin/events", label: "Events & tickets", icon: CalendarDays },
   { href: "/admin/orders", label: "Ticket buyers", icon: Ticket },
+  { href: "/admin/password", label: "Change password", icon: KeyRound },
+  { href: "/admin/password", label: "Change password", icon: KeyRound },
 ];
 
 export default function AdminLayout({ children }: { children: ReactNode }) {
@@ -19,17 +21,31 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const { data, ready } = useSiteStore();
   const [authorized, setAuthorized] = useState(false);
+  const [adminEmail, setAdminEmail] = useState("");
 
   useEffect(() => {
-    if (sessionStorage.getItem("dap-admin-session") !== "active") {
-      router.replace("/admin/login");
-      return;
+    let active = true;
+    async function verifyAdmin() {
+      try {
+        const response = await fetch("/api/admin/session", { cache: "no-store" });
+        const result = await response.json() as { email?: string; error?: string };
+        if (!response.ok) {
+          router.replace("/admin/login");
+          return;
+        }
+        if (!active) return;
+        setAdminEmail(result.email ?? "");
+        setAuthorized(true);
+      } catch {
+        router.replace("/admin/login?error=auth-unavailable");
+      }
     }
-    setAuthorized(true);
+    void verifyAdmin();
+    return () => { active = false; };
   }, [router]);
 
-  function signOut() {
-    sessionStorage.removeItem("dap-admin-session");
+  async function signOut() {
+    await fetch("/api/admin/logout", { method: "POST" });
     router.replace("/admin/login");
   }
 
@@ -50,8 +66,8 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
           })}
         </nav>
         <div className="mt-auto border-t border-dap-border-muted p-4">
-          <p className="font-mono text-[8px] text-muted-foreground">LOCAL STORAGE</p>
-          <p className="mt-1 text-[10px] leading-4 text-muted-foreground">Saved on this browser only.</p>
+          <p className="font-mono text-[8px] text-muted-foreground">SIGNED IN</p>
+          <p className="mt-1 break-all text-[10px] leading-4 text-muted-foreground">{adminEmail}</p>
           <Button variant="ghost" size="sm" className="mt-3 w-full justify-start" onClick={signOut}><LogOut size={14} /> Sign out</Button>
         </div>
       </aside>

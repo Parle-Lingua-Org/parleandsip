@@ -6,10 +6,15 @@ begin;
 create table if not exists public.profiles (
   id uuid primary key references auth.users (id) on delete cascade,
   email text,
+  username text,
   role text not null default 'member' check (role in ('member', 'admin')),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+alter table public.profiles add column if not exists username text;
+update public.profiles set username = coalesce(nullif(username, ''), email) where username is null or username = '';
+create unique index if not exists profiles_username_unique_idx on public.profiles (lower(username)) where username is not null;
 
 create table if not exists public.events (
   id uuid primary key default gen_random_uuid(),
@@ -74,9 +79,18 @@ create table if not exists public.ticket_orders (
   subtotal_ngn numeric(12, 2) not null default 0 check (subtotal_ngn >= 0),
   expires_at timestamptz not null default (now() + interval '15 minutes'),
   payment_reference text unique,
+  paid_at timestamptz,
+  email_status text not null default 'pending' check (email_status in ('pending', 'sending', 'sent', 'failed')),
+  email_sent_at timestamptz,
+  email_error text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+alter table public.ticket_orders add column if not exists paid_at timestamptz;
+alter table public.ticket_orders add column if not exists email_status text not null default 'pending';
+alter table public.ticket_orders add column if not exists email_sent_at timestamptz;
+alter table public.ticket_orders add column if not exists email_error text;
 
 create table if not exists public.ticket_order_items (
   id uuid primary key default gen_random_uuid(),
@@ -88,6 +102,21 @@ create table if not exists public.ticket_order_items (
   unit_price_ngn numeric(12, 2) not null check (unit_price_ngn >= 0),
   line_total_ngn numeric(12, 2) generated always as (quantity * unit_price_ngn) stored,
   created_at timestamptz not null default now()
+);
+
+create table if not exists public.ticket_codes (
+  id uuid primary key default gen_random_uuid(),
+  order_id uuid not null references public.ticket_orders (id) on delete cascade,
+  order_item_id uuid not null references public.ticket_order_items (id) on delete cascade,
+  event_id uuid not null references public.events (id) on delete restrict,
+  ticket_number integer not null check (ticket_number > 0),
+  ticket_code text not null unique,
+  ticket_name text not null,
+  status text not null default 'issued' check (status in ('issued', 'checked_in', 'cancelled')),
+  checked_in_at timestamptz,
+  checked_in_by uuid references public.profiles (id) on delete set null,
+  created_at timestamptz not null default now(),
+  unique (order_id, ticket_number)
 );
 
 create table if not exists public.site_settings (
@@ -125,6 +154,10 @@ create index if not exists ticket_orders_event_idx
   on public.ticket_orders (event_id, created_at desc);
 create index if not exists ticket_order_items_order_idx
   on public.ticket_order_items (order_id);
+create index if not exists ticket_codes_event_status_idx
+  on public.ticket_codes (event_id, status);
+create index if not exists ticket_codes_order_idx
+  on public.ticket_codes (order_id, ticket_number);
 
 create or replace function public.set_updated_at()
 returns trigger
@@ -164,9 +197,11 @@ security definer
 set search_path = public, pg_temp
 as $$
 begin
-  insert into public.profiles (id, email)
-  values (new.id, new.email)
-  on conflict (id) do update set email = excluded.email;
+  insert into public.profiles (id, email, username)
+  values (new.id, new.email, coalesce(nullif(new.raw_user_meta_data ->> 'username', ''), new.email))
+  on conflict (id) do update set
+    email = excluded.email,
+    username = coalesce(profiles.username, excluded.username);
   return new;
 end;
 $$;
@@ -176,9 +211,11 @@ create trigger on_auth_user_created
 after insert on auth.users
 for each row execute function public.handle_new_auth_user();
 
-insert into public.profiles (id, email)
-select id, email from auth.users
-on conflict (id) do update set email = excluded.email;
+insert into public.profiles (id, email, username)
+select id, email, email from auth.users
+on conflict (id) do update set
+  email = excluded.email,
+  username = coalesce(profiles.username, excluded.username);
 
 create or replace function public.is_admin()
 returns boolean
@@ -352,11 +389,62 @@ begin
 end;
 $$;
 
+create or replace function public.admin_check_in_ticket(p_ticket_code text)
+returns table (
+  ticket_code_id uuid,
+  event_title text,
+  buyer_name text,
+  ticket_name text,
+  ticket_status text,
+  checked_in_at timestamptz
+)
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  v_ticket public.ticket_codes%rowtype;
+  v_event public.events%rowtype;
+  v_order public.ticket_orders%rowtype;
+begin
+  if not public.is_admin() then
+    raise exception 'Admin access required.' using errcode = '42501';
+  end if;
+
+  select * into v_ticket from public.ticket_codes where ticket_code = trim(p_ticket_code) for update;
+  if not found then
+    raise exception 'Ticket code was not found.' using errcode = 'P0002';
+  end if;
+  if v_ticket.status = 'checked_in' then
+    raise exception 'Ticket was already checked in.' using errcode = '22023';
+  end if;
+  if v_ticket.status <> 'issued' then
+    raise exception 'This ticket is not valid for entry.' using errcode = '22023';
+  end if;
+
+  select * into v_event from public.events where id = v_ticket.event_id;
+  select * into v_order from public.ticket_orders where id = v_ticket.order_id;
+  if v_order.status <> 'paid' then
+    raise exception 'Payment for this ticket has not been confirmed.' using errcode = '22023';
+  end if;
+  if (v_event.starts_at at time zone 'Africa/Lagos')::date <> (now() at time zone 'Africa/Lagos')::date then
+    raise exception 'Tickets can only be checked in on the event date.' using errcode = '22023';
+  end if;
+
+  update public.ticket_codes
+  set status = 'checked_in', checked_in_at = now(), checked_in_by = auth.uid()
+  where id = v_ticket.id;
+
+  return query
+  select v_ticket.id, v_event.title, v_order.buyer_name, v_ticket.ticket_name, 'checked_in'::text, now();
+end;
+$$;
+
 insert into public.site_settings (setting_key, content, theme)
 values (
   'main',
   '{"brandName":"Parle & Sip","footerLocation":"LAGOS · NIGERIA","footerCurrency":"NGN · ₦ NAIRA","heroTitle":"A little French.","heroSecondLine":"A lot to share.","footerText":"Learn. Connect. Experience. Parlez et profitez !"}'::jsonb,
-  '{"background":"#f3f1e8","foreground":"#171815","primary":"#c8f36b","secondary":"#e4e9d8","muted":"#e7e5db","mutedForeground":"#686c63","accent":"#ff8064","ring":"#4a6828","info":"#d9e3fa"}'::jsonb
+  '{"background":"#f5f6f8","foreground":"#192637","primary":"#9a1f26","secondary":"#e5e9ef","muted":"#edf0f4","mutedForeground":"#526173","accent":"#be8f3f","ring":"#9a1f26","info":"#dce4ef"}'::jsonb
 )
 on conflict (setting_key) do update set
   content = site_settings.content || excluded.content,
@@ -435,6 +523,7 @@ alter table public.event_images enable row level security;
 alter table public.ticket_tiers enable row level security;
 alter table public.ticket_orders enable row level security;
 alter table public.ticket_order_items enable row level security;
+alter table public.ticket_codes enable row level security;
 alter table public.site_settings enable row level security;
 
 drop policy if exists "profiles_read_self_or_admin" on public.profiles;
@@ -539,8 +628,14 @@ for all to authenticated
 using ((select public.is_admin()))
 with check ((select public.is_admin()));
 
+drop policy if exists "admins_read_ticket_codes" on public.ticket_codes;
+create policy "admins_read_ticket_codes" on public.ticket_codes
+for select to authenticated
+using ((select public.is_admin()));
+
 grant select on public.events, public.event_images, public.ticket_tiers, public.site_settings to anon, authenticated;
 grant select on public.profiles, public.ticket_orders, public.ticket_order_items to authenticated;
+grant select on public.ticket_codes to authenticated;
 grant insert, update, delete on public.events, public.event_images, public.ticket_tiers, public.site_settings to authenticated;
 grant update on public.ticket_orders to authenticated;
 grant insert, update, delete on public.ticket_order_items to authenticated;
@@ -551,10 +646,14 @@ revoke all on function public.create_ticket_order(uuid, text, text, jsonb) from 
 grant execute on function public.create_ticket_order(uuid, text, text, jsonb) to anon, authenticated;
 revoke all on function public.expire_pending_ticket_orders() from public;
 grant execute on function public.expire_pending_ticket_orders() to authenticated;
+revoke all on function public.admin_check_in_ticket(text) from public;
+grant execute on function public.admin_check_in_ticket(text) to authenticated;
 
 commit;
 
--- Promote a signed-up user to admin after the profile trigger has run:
--- update public.profiles set role = 'admin' where email = 'admin@example.com';
+-- After creating the Supabase Auth user with this email, promote its profile:
+-- update public.profiles
+-- set username = 'admin@parleandsip.com', role = 'admin'
+-- where lower(email) = lower('admin@parleandsip.com');
 -- Call this periodically (or schedule with pg_cron) to release unpaid reservations:
 -- select public.expire_pending_ticket_orders();
