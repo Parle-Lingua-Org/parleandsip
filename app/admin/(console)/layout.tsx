@@ -11,7 +11,7 @@ const navigation = [
   { href: "/admin", label: "Overview", icon: LayoutDashboard },
   { href: "/admin/content", label: "Site content", icon: Palette },
   { href: "/admin/events", label: "Events & tickets", icon: CalendarDays },
-  { href: "/admin/orders", label: "Ticket buyers", icon: Ticket },
+  { href: "/admin/orders", label: "Orders", icon: Ticket },
   { href: "/admin/password", label: "Change password", icon: KeyRound },
 ];
 

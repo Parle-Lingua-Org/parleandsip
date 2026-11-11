@@ -54,6 +54,14 @@ function readSavedData(): SiteData {
     for (const key of Object.keys(legacyContent) as Array<keyof SiteContent>) {
       if (parsed.content?.[key] === legacyContent[key]) content[key] = initialSiteData.content[key];
     }
+    if (!content.cityName || /lagos/i.test(content.cityName)) content.cityName = initialSiteData.content.cityName;
+    if (!content.areaFilterAll || /lagos/i.test(content.areaFilterAll)) content.areaFilterAll = initialSiteData.content.areaFilterAll;
+    if (!content.eventAreas || /yaba|victoria island|ikoyi|lekki|ikeja/i.test(content.eventAreas)) {
+      content.eventAreas = initialSiteData.content.eventAreas;
+    }
+    if (!content.footerLocation || /lagos/i.test(content.footerLocation)) {
+      content.footerLocation = initialSiteData.content.footerLocation;
+    }
     const legacyEventTitles: Record<string, string> = {
       "lagos-language-mixer": "Lagos Language Mixer",
       "french-table": "French Table: Speak Without Notes",
@@ -86,7 +94,7 @@ function readSavedData(): SiteData {
         const image = event.image ?? fallback?.image ?? "";
         const tierPrice = event.price ?? fallback?.ticketTiers[0]?.price ?? 5000;
         const isOldSample = Boolean(fallback && event.title === legacyEventTitles[id]);
-        return {
+        const next = {
           ...fallback,
           ...event,
           ...(isOldSample ? fallback : {}),
@@ -95,6 +103,11 @@ function readSavedData(): SiteData {
           gallery: isOldSample && fallback ? fallback.gallery : Array.isArray(event.gallery) ? event.gallery : [image],
           ticketTiers: isOldSample && fallback ? fallback.ticketTiers : Array.isArray(event.ticketTiers) && event.ticketTiers.length ? event.ticketTiers : createTicketTiers(id, tierPrice),
         } as EventItem;
+        if (fallback && (next.area === event.area || !event.area) && /^(Yaba|Victoria Island|Ikoyi|Lekki|Ikeja)$/i.test(next.area)) {
+          next.area = fallback.area;
+          if (!event.venue || /Yaba|Victoria Island|Ikoyi|Lekki|Ikeja|Lagos/i.test(event.venue)) next.venue = fallback.venue;
+        }
+        return next;
       }),
       orders: Array.isArray(parsed.orders) ? parsed.orders : [],
     };

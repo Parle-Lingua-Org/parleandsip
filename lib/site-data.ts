@@ -31,6 +31,7 @@ export type SiteContent = {
   navExplore: string;
   navCommunity: string;
   navPros: string;
+  navContact: string;
   heroEyebrow: string;
   heroTitle: string;
   heroSecondLine: string;
@@ -54,7 +55,18 @@ export type SiteContent = {
   footerText: string;
   footerLocation: string;
   footerCurrency: string;
+  cityName: string;
+  areaFilterAll: string;
+  eventAreas: string;
+  contactEmail: string;
+  contactWhatsapp: string;
+  instagramHandle: string;
+  tiktokHandle: string;
 };
+
+export function parseEventAreas(value: string) {
+  return value.split(",").map((area) => area.trim()).filter(Boolean);
+}
 
 export type SiteTheme = {
   background: string;
@@ -103,6 +115,7 @@ export const initialSiteData: SiteData = {
     navExplore: "Explore experiences",
     navCommunity: "Our community",
     navPros: "Host with us",
+    navContact: "Contact",
     heroEyebrow: "LEARN. CONNECT. EXPERIENCE.",
     heroTitle: "A little French.",
     heroSecondLine: "A lot to share.",
@@ -124,8 +137,15 @@ export const initialSiteData: SiteData = {
     proDescription: "Host a conversation, share an art practice, curate a tasting, or bring a new cultural idea to the community.",
     proCta: "Create with Parle & Sip",
     footerText: "Learn. Connect. Experience. Parlez et profitez !",
-    footerLocation: "LAGOS · NIGERIA",
+    footerLocation: "ABUJA · NIGERIA",
     footerCurrency: "NGN · ₦ NAIRA",
+    cityName: "Abuja",
+    areaFilterAll: "All Abuja",
+    eventAreas: "Maitama, Wuse, Garki, Asokoro, Jabi, Gwarinpa",
+    contactEmail: "Parlelinguaservices@gmail.com",
+    contactWhatsapp: "+2349162777004",
+    instagramHandle: "parlesip",
+    tiktokHandle: "parlesip",
   },
   theme: {
     background: "#f5f6f8",
@@ -147,8 +167,8 @@ export const initialSiteData: SiteData = {
       date: "Saturday, November 14, 2026",
       dateShort: "NOV 14",
       time: "4:00 PM",
-      venue: "The Nest, Yaba",
-      area: "Yaba",
+      venue: "The Nest, Maitama",
+      area: "Maitama",
       languages: ["French", "English"],
       ticketTiers: createTicketTiers("french-culture-social", 5000),
       image: photo("photo-1528605248644-14dd04022da1"),
@@ -163,8 +183,8 @@ export const initialSiteData: SiteData = {
       date: "Sunday, November 15, 2026",
       dateShort: "NOV 15",
       time: "2:00 PM",
-      venue: "Cafe Neo, Victoria Island",
-      area: "Victoria Island",
+      venue: "Cafe Neo, Wuse",
+      area: "Wuse",
       languages: ["French", "English"],
       ticketTiers: createTicketTiers("francophone-food-table", 7000),
       image: photo("photo-1517248135467-4c7edcad34c4"),
@@ -179,8 +199,8 @@ export const initialSiteData: SiteData = {
       date: "Saturday, November 21, 2026",
       dateShort: "NOV 21",
       time: "10:00 AM",
-      venue: "Alliance Française, Ikoyi",
-      area: "Ikoyi",
+      venue: "Alliance Française, Maitama",
+      area: "Maitama",
       languages: ["French", "English"],
       ticketTiers: createTicketTiers("francophone-film-club", 8000),
       image: photo("photo-1521737711867-e3b97375f902"),
@@ -195,8 +215,8 @@ export const initialSiteData: SiteData = {
       date: "Sunday, November 22, 2026",
       dateShort: "NOV 22",
       time: "11:30 AM",
-      venue: "The Borough, Ikoyi",
-      area: "Ikoyi",
+      venue: "The Borough, Asokoro",
+      area: "Asokoro",
       languages: ["French", "English"],
       ticketTiers: createTicketTiers("french-through-art", 8500),
       image: photo("photo-1529156069898-49953e39b3ac"),
@@ -211,8 +231,8 @@ export const initialSiteData: SiteData = {
       date: "Saturday, November 28, 2026",
       dateShort: "NOV 28",
       time: "3:00 PM",
-      venue: "Terra Kulture, Victoria Island",
-      area: "Victoria Island",
+      venue: "Terra Kulture, Jabi",
+      area: "Jabi",
       languages: ["French", "English"],
       ticketTiers: createTicketTiers("francophone-art-jam", 10000),
       image: photo("photo-1516280440614-37939bbacd81"),
@@ -227,8 +247,8 @@ export const initialSiteData: SiteData = {
       date: "Sunday, November 29, 2026",
       dateShort: "NOV 29",
       time: "1:00 PM",
-      venue: "The Garden, Lekki Phase 1",
-      area: "Lekki",
+      venue: "The Garden, Gwarinpa",
+      area: "Gwarinpa",
       languages: ["French", "English"],
       ticketTiers: createTicketTiers("jeux-en-francais", 6000),
       image: photo("photo-1511632765486-a01980e01a18"),
