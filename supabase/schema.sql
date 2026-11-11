@@ -617,7 +617,13 @@ begin
 end;
 $$;
 
-create or replace function public.admin_check_in_ticket(p_ticket_code text)
+drop function if exists public.admin_check_in_ticket(text);
+drop function if exists public.admin_check_in_ticket(text, uuid);
+
+create or replace function public.admin_check_in_ticket(
+  p_ticket_code text,
+  p_event_id uuid
+)
 returns table (
   ticket_code_id uuid,
   event_title text,
@@ -634,14 +640,27 @@ declare
   v_ticket public.ticket_codes%rowtype;
   v_event public.events%rowtype;
   v_order public.ticket_orders%rowtype;
+  v_event_day date;
+  v_today date;
 begin
   if not public.is_admin() then
     raise exception 'Admin access required.' using errcode = '42501';
+  end if;
+  if p_event_id is null then
+    raise exception 'Select the event before scanning tickets.' using errcode = '22023';
+  end if;
+
+  select * into v_event from public.events where id = p_event_id;
+  if not found then
+    raise exception 'The selected event was not found.' using errcode = 'P0002';
   end if;
 
   select * into v_ticket from public.ticket_codes where ticket_code = trim(p_ticket_code) for update;
   if not found then
     raise exception 'Ticket code was not found.' using errcode = 'P0002';
+  end if;
+  if v_ticket.event_id is distinct from p_event_id then
+    raise exception 'This ticket does not belong to the selected event.' using errcode = '22023';
   end if;
   if v_ticket.status = 'checked_in' then
     raise exception 'Ticket was already checked in.' using errcode = '22023';
@@ -650,13 +669,21 @@ begin
     raise exception 'This ticket is not valid for entry.' using errcode = '22023';
   end if;
 
-  select * into v_event from public.events where id = v_ticket.event_id;
   select * into v_order from public.ticket_orders where id = v_ticket.order_id;
   if v_order.status <> 'paid' then
     raise exception 'Payment for this ticket has not been confirmed.' using errcode = '22023';
   end if;
-  if (v_event.starts_at at time zone 'Africa/Lagos')::date <> (now() at time zone 'Africa/Lagos')::date then
-    raise exception 'Tickets can only be checked in on the event date.' using errcode = '22023';
+
+  v_event_day := (v_event.starts_at at time zone 'Africa/Lagos')::date;
+  v_today := (now() at time zone 'Africa/Lagos')::date;
+
+  -- Door opens 2 hours before start.
+  if now() < (v_event.starts_at - interval '2 hours') then
+    raise exception 'Event hasn''t started.' using errcode = '22023';
+  end if;
+  -- Check-in stays open through the event day and closes the next day.
+  if v_today > v_event_day then
+    raise exception 'This event has already ended.' using errcode = '22023';
   end if;
 
   update public.ticket_codes
@@ -878,8 +905,8 @@ revoke all on function public.complete_ticket_email(uuid, text, text) from publi
 grant execute on function public.complete_ticket_email(uuid, text, text) to service_role;
 revoke all on function public.expire_pending_ticket_orders() from public;
 grant execute on function public.expire_pending_ticket_orders() to authenticated;
-revoke all on function public.admin_check_in_ticket(text) from public;
-grant execute on function public.admin_check_in_ticket(text) to authenticated;
+revoke all on function public.admin_check_in_ticket(text, uuid) from public;
+grant execute on function public.admin_check_in_ticket(text, uuid) to authenticated;
 
 commit;
 

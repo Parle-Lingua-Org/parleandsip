@@ -3,7 +3,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { CalendarDays, Eye, KeyRound, LayoutDashboard, LogOut, Palette, Ticket, UsersRound } from "lucide-react";
+import { CalendarDays, Eye, KeyRound, LayoutDashboard, LogOut, Palette, ScanLine, Ticket, UsersRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useSiteStore } from "@/lib/site-store";
 
@@ -12,6 +12,7 @@ const navigation = [
   { href: "/admin/content", label: "Site content", icon: Palette },
   { href: "/admin/events", label: "Events & tickets", icon: CalendarDays },
   { href: "/admin/orders", label: "Orders", icon: Ticket },
+  { href: "/admin/check-in", label: "Scan tickets", icon: ScanLine },
   { href: "/admin/password", label: "Change password", icon: KeyRound },
 ];
 

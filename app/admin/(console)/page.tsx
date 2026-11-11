@@ -31,7 +31,10 @@ export default function AdminOverviewPage() {
           <div className="divide-y divide-dap-border-muted">{data.events.slice(0, 5).map((event) => <div key={event.id} className="flex items-center justify-between gap-3 px-4 py-3"><div className="min-w-0"><p className="truncate text-xs font-semibold">{event.title}</p><p className="mt-1 text-[10px] text-muted-foreground">{event.dateShort} · {event.area} · {event.ticketTiers.length} ticket types</p></div><span className="shrink-0 text-[10px] font-semibold">from {formatNaira(Math.min(...event.ticketTiers.map((tier) => tier.price)))}</span></div>)}</div>
         </Card>
       </div>
-      <Card className="flex flex-wrap items-center justify-between gap-4 bg-secondary p-4"><div><p className="font-mono text-[8px] text-muted-foreground">QUICK ACTION</p><p className="mt-1 text-sm font-bold">Refresh the look of Parle & Sip</p><p className="mt-1 text-[10px] text-muted-foreground">Update the brand, footer, favicon and shared palette.</p></div><Button asChild variant="outline" size="sm"><Link href="/admin/content">Edit site content <ArrowRight size={14} /></Link></Button></Card>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Card className="flex flex-wrap items-center justify-between gap-4 bg-secondary p-4"><div><p className="font-mono text-[8px] text-muted-foreground">QUICK ACTION</p><p className="mt-1 text-sm font-bold">Scan tickets at the door</p><p className="mt-1 text-[10px] text-muted-foreground">Use the camera or paste a ticket code from the QR email.</p></div><Button asChild variant="outline" size="sm"><Link href="/admin/check-in">Open scanner <ArrowRight size={14} /></Link></Button></Card>
+        <Card className="flex flex-wrap items-center justify-between gap-4 bg-secondary p-4"><div><p className="font-mono text-[8px] text-muted-foreground">QUICK ACTION</p><p className="mt-1 text-sm font-bold">Refresh the look of Parle & Sip</p><p className="mt-1 text-[10px] text-muted-foreground">Update the brand, footer, favicon and shared palette.</p></div><Button asChild variant="outline" size="sm"><Link href="/admin/content">Edit site content <ArrowRight size={14} /></Link></Button></Card>
+      </div>
     </div>
   );
 }
