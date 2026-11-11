@@ -24,12 +24,14 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { formatNaira, parseEventAreas, type EventItem } from "@/lib/site-data";
 import { useSiteStore } from "@/lib/site-store";
 import Image from "next/image";
 import LogoUse from "@/app/logo.webp";
 
 const categoryOptions = ["All experiences", "French conversation", "Francophone culture", "Art & creativity", "Food & gastronomy", "Games & conversation"];
+const createWithFormUrl = "https://docs.google.com/forms/d/1LhlPUi_uVlC41u3JguE9TOTjKlaISiVqs1AbKIi3Q9k/viewform?embedded=true";
 
 export function PublicHome() {
   const { data } = useSiteStore();
@@ -40,6 +42,15 @@ export function PublicHome() {
   const [area, setArea] = useState(areaFilterAll);
   const [query, setQuery] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
+  const [createFormOpen, setCreateFormOpen] = useState(false);
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
+  const [feedbackName, setFeedbackName] = useState("");
+  const [feedbackEmail, setFeedbackEmail] = useState("");
+  const [feedbackSubject, setFeedbackSubject] = useState("");
+  const [feedbackMessage, setFeedbackMessage] = useState("");
+  const [feedbackBusy, setFeedbackBusy] = useState(false);
+  const [feedbackError, setFeedbackError] = useState("");
+  const [feedbackSent, setFeedbackSent] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<EventItem | null>(null);
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const [selectedTierId, setSelectedTierId] = useState("");
@@ -160,7 +171,7 @@ export function PublicHome() {
           <a className="border-b border-dap-border-soft py-3 text-xs text-muted-foreground md:border-0 md:py-0" href="#for-pros" onClick={() => setMenuOpen(false)}>{content.navPros}</a>
           <a className="py-3 text-xs text-muted-foreground md:py-0" href="#contact" onClick={() => setMenuOpen(false)}>{content.navContact}</a>
         </nav>
-        <Button asChild size="sm" variant="outline" className="ml-auto hidden md:inline-flex"><a href="#for-pros">{content.proCta} <ArrowRight size={14} /></a></Button>
+        <Button type="button" size="sm" variant="outline" className="ml-auto hidden md:inline-flex" onClick={() => setCreateFormOpen(true)}>{content.proCta} <ArrowRight size={14} /></Button>
       </header>
 
       <div className="mx-auto max-w-[1200px] px-4 sm:px-8">
@@ -239,7 +250,18 @@ export function PublicHome() {
         <section id="for-pros" className="mt-14 grid gap-4 border-2 border-foreground bg-secondary p-4 shadow-[4px_4px_0_var(--foreground)] sm:grid-cols-[48px_1fr_auto] sm:items-center sm:p-6">
           <span className="grid size-11 place-items-center border-2 border-foreground bg-primary"><Languages size={21} /></span>
           <div><p className="font-mono text-[8px] text-muted-foreground">{content.proEyebrow}</p><h2 className="mt-1 text-xl font-bold leading-tight">{content.proTitle}<br /><em className="font-serif font-semibold">{content.proEmphasis}</em></h2><p className="mt-1 text-[10px] text-muted-foreground">{content.proDescription}</p></div>
-          <Button asChild variant="accent" size="sm"><a href={`mailto:${content.contactEmail}?subject=Create%20with%20Parle%20%26%20Sip`}>{content.proCta} <ArrowRight size={14} /></a></Button>
+          <Button
+            type="button"
+            variant="accent"
+            size="sm"
+            onClick={() => {
+              setFeedbackOpen(true);
+              setFeedbackSent(false);
+              setFeedbackError("");
+            }}
+          >
+            Send feedback <ArrowRight size={14} />
+          </Button>
         </section>
 
         <section id="contact" className="mt-14 scroll-mt-5" aria-labelledby="contact-title">
@@ -272,6 +294,105 @@ export function PublicHome() {
           <span className="ml-auto text-right font-mono text-[8px] tracking-wide text-muted-foreground">{content.footerLocation} <span className="px-1 text-accent">●</span> {content.footerCurrency}</span>
         </footer>
       </div>
+
+      <Dialog open={createFormOpen} onOpenChange={setCreateFormOpen}>
+        <DialogContent className="max-w-3xl overflow-hidden p-0">
+          <div className="border-b-2 border-foreground px-5 py-4 pr-14">
+            <p className="font-mono text-[9px] tracking-wide text-muted-foreground">RSVP · ABUJA PARLE FRANÇAIS</p>
+            <DialogTitle className="mt-1 text-xl font-bold">{content.proCta}</DialogTitle>
+            <DialogDescription className="mt-1 text-xs text-muted-foreground">Fill the form below. We&apos;ll use your answers for your place and ticket name.</DialogDescription>
+          </div>
+          <iframe
+            title="Join our community form"
+            src={createWithFormUrl}
+            className="h-[min(70dvh,720px)] w-full border-0 bg-card"
+            loading="lazy"
+          />
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={feedbackOpen}
+        onOpenChange={(open) => {
+          setFeedbackOpen(open);
+          if (!open) {
+            setFeedbackError("");
+            setFeedbackBusy(false);
+          }
+        }}
+      >
+        <DialogContent className="p-0">
+          {feedbackSent ? (
+            <div className="p-5 text-center sm:p-6">
+              <span className="mx-auto grid size-11 place-items-center border-2 border-foreground bg-primary"><Mail size={21} /></span>
+              <p className="mt-4 font-mono text-[9px] text-muted-foreground">MESSAGE SENT</p>
+              <DialogTitle className="mt-1 text-2xl font-bold">Merci.</DialogTitle>
+              <DialogDescription className="mx-auto mt-2 max-w-xs text-xs leading-5 text-muted-foreground">
+                Your feedback reached {content.contactEmail}. We&apos;ll reply if a response is needed.
+              </DialogDescription>
+              <Button type="button" className="mt-5 w-full" onClick={() => setFeedbackOpen(false)}>Close</Button>
+            </div>
+          ) : (
+            <form
+              className="space-y-4 p-4 sm:p-5"
+              onSubmit={async (event) => {
+                event.preventDefault();
+                setFeedbackBusy(true);
+                setFeedbackError("");
+                try {
+                  const response = await fetch("/api/contact", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                      name: feedbackName.trim(),
+                      email: feedbackEmail.trim(),
+                      subject: feedbackSubject.trim(),
+                      message: feedbackMessage.trim(),
+                    }),
+                  });
+                  const result = await response.json() as { error?: string };
+                  if (!response.ok) throw new Error(result.error || "Unable to send your message.");
+                  setFeedbackSent(true);
+                  setFeedbackName("");
+                  setFeedbackEmail("");
+                  setFeedbackSubject("");
+                  setFeedbackMessage("");
+                } catch (reason) {
+                  setFeedbackError(reason instanceof Error ? reason.message : "Unable to send your message.");
+                } finally {
+                  setFeedbackBusy(false);
+                }
+              }}
+            >
+              <div className="pr-8">
+                <p className="font-mono text-[8px] text-muted-foreground">FEEDBACK · SUGGESTIONS · INQUIRY</p>
+                <DialogTitle className="mt-1 text-xl font-bold">Send us a message.</DialogTitle>
+                <DialogDescription className="mt-1 text-xs text-muted-foreground">
+                  Share feedback, a suggestion, or an inquiry. It goes straight to {content.contactEmail}.
+                </DialogDescription>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label className="grid gap-1 text-[10px] font-semibold">Your name
+                  <Input autoComplete="name" required value={feedbackName} onChange={(event) => setFeedbackName(event.target.value)} />
+                </label>
+                <label className="grid gap-1 text-[10px] font-semibold">Email
+                  <Input autoComplete="email" type="email" required value={feedbackEmail} onChange={(event) => setFeedbackEmail(event.target.value)} />
+                </label>
+              </div>
+              <label className="grid gap-1 text-[10px] font-semibold">Subject
+                <Input required maxLength={120} value={feedbackSubject} onChange={(event) => setFeedbackSubject(event.target.value)} placeholder="Feedback, suggestion, or inquiry" />
+              </label>
+              <label className="grid gap-1 text-[10px] font-semibold">Message
+                <Textarea required rows={5} maxLength={4000} value={feedbackMessage} onChange={(event) => setFeedbackMessage(event.target.value)} placeholder="Tell us what’s on your mind…" />
+              </label>
+              {feedbackError ? <p role="alert" className="text-[10px] text-accent-foreground">{feedbackError}</p> : null}
+              <Button className="w-full" type="submit" disabled={feedbackBusy}>
+                {feedbackBusy ? "Sending…" : "Send message"} <ArrowRight size={15} />
+              </Button>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={Boolean(selectedEvent)} onOpenChange={(open) => { if (!open) { setSelectedEvent(null); setOrderComplete(false); setCheckoutUrl(""); } }}>
         {selectedEvent && <DialogContent className="p-0">

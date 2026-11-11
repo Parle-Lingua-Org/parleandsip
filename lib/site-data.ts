@@ -135,7 +135,7 @@ export const initialSiteData: SiteData = {
     proTitle: "Bring your Francophone world.",
     proEmphasis: "Let us make a day of it.",
     proDescription: "Host a conversation, share an art practice, curate a tasting, or bring a new cultural idea to the community.",
-    proCta: "Create with Parle & Sip",
+    proCta: "Join our community",
     footerText: "Learn. Connect. Experience. Parlez et profitez !",
     footerLocation: "ABUJA · NIGERIA",
     footerCurrency: "NGN · ₦ NAIRA",

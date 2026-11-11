@@ -62,6 +62,9 @@ function readSavedData(): SiteData {
     if (!content.footerLocation || /lagos/i.test(content.footerLocation)) {
       content.footerLocation = initialSiteData.content.footerLocation;
     }
+    if (!content.proCta || /create with parle/i.test(content.proCta) || content.proCta === "Bring an event to Dap") {
+      content.proCta = initialSiteData.content.proCta;
+    }
     const legacyEventTitles: Record<string, string> = {
       "lagos-language-mixer": "Lagos Language Mixer",
       "french-table": "French Table: Speak Without Notes",

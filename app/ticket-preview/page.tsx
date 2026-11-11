@@ -1,5 +1,5 @@
-import { TicketPreview } from "@/components/site/ticket-preview";
+import { notFound } from "next/navigation";
 
 export default function Page() {
-  return <TicketPreview />;
+  notFound();
 }
