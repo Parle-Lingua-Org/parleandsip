@@ -8,6 +8,7 @@ import {
   Clock3,
   Globe2,
   Languages,
+  Mail,
   MapPin,
   Menu,
   Minus,
@@ -23,19 +24,20 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { formatNaira, type EventItem } from "@/lib/site-data";
+import { formatNaira, parseEventAreas, type EventItem } from "@/lib/site-data";
 import { useSiteStore } from "@/lib/site-store";
 import Image from "next/image";
 import LogoUse from "@/app/logo.webp";
 
 const categoryOptions = ["All experiences", "French conversation", "Francophone culture", "Art & creativity", "Food & gastronomy", "Games & conversation"];
-const areaOptions = ["All Lagos", "Yaba", "Victoria Island", "Ikeja", "Ikoyi", "Lekki"];
 
 export function PublicHome() {
   const { data } = useSiteStore();
   const { content } = data;
+  const areaFilterAll = content.areaFilterAll || `All ${content.cityName || "Abuja"}`;
+  const areaOptions = [areaFilterAll, ...parseEventAreas(content.eventAreas)];
   const [category, setCategory] = useState("All experiences");
-  const [area, setArea] = useState("All Lagos");
+  const [area, setArea] = useState(areaFilterAll);
   const [query, setQuery] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<EventItem | null>(null);
@@ -52,7 +54,7 @@ export function PublicHome() {
   const featuredEvent = data.events.find((event) => event.id === content.featuredEventId) ?? data.events[0];
   const visibleEvents = data.events.filter((event) => {
     const categoryMatch = category === "All experiences" || event.category === category;
-    const areaMatch = area === "All Lagos" || event.area === area;
+    const areaMatch = area === areaFilterAll || event.area === area;
     const searchMatch = !query.trim() || `${event.title} ${event.host} ${event.category} ${event.venue} ${event.area} ${event.languages.join(" ")}`.toLowerCase().includes(query.trim().toLowerCase());
     return categoryMatch && areaMatch && searchMatch;
   });
@@ -155,7 +157,8 @@ export function PublicHome() {
         <nav className={`${menuOpen ? "absolute left-0 right-0 top-[66px] flex border-b-2 border-foreground bg-background px-4 shadow-[0_5px_0_var(--foreground)] md:static md:h-full md:border-0 md:bg-transparent md:p-0 md:shadow-none" : "hidden md:flex"} flex-col items-stretch gap-0 md:ml-4 md:flex-row md:items-center md:gap-7`} aria-label="Main navigation">
           <a className="border-b border-dap-border-soft py-3 text-xs font-semibold md:border-0 md:py-0" href="#events" onClick={() => setMenuOpen(false)}>{content.navExplore}</a>
           <a className="border-b border-dap-border-soft py-3 text-xs text-muted-foreground md:border-0 md:py-0" href="#community" onClick={() => setMenuOpen(false)}>{content.navCommunity}</a>
-          <a className="py-3 text-xs text-muted-foreground md:py-0" href="#for-pros" onClick={() => setMenuOpen(false)}>{content.navPros}</a>
+          <a className="border-b border-dap-border-soft py-3 text-xs text-muted-foreground md:border-0 md:py-0" href="#for-pros" onClick={() => setMenuOpen(false)}>{content.navPros}</a>
+          <a className="py-3 text-xs text-muted-foreground md:py-0" href="#contact" onClick={() => setMenuOpen(false)}>{content.navContact}</a>
         </nav>
         <Button asChild size="sm" variant="outline" className="ml-auto hidden md:inline-flex"><a href="#for-pros">{content.proCta} <ArrowRight size={14} /></a></Button>
       </header>
@@ -175,7 +178,7 @@ export function PublicHome() {
             {featuredEvent && <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `linear-gradient(180deg,rgb(var(--dap-overlay-rgb)/.04) 18%,rgb(var(--dap-overlay-rgb)/.78) 100%),url("${content.heroImage || featuredEvent.image}")` }} />}
             <Badge className="absolute left-4 top-4 gap-1.5"><Sparkles size={12} /> THIS WEEK&apos;S PICK</Badge>
             <div className="absolute inset-x-4 bottom-4 sm:inset-x-5 sm:bottom-5">
-              <p className="font-mono text-[9px] uppercase tracking-wide text-dap-feature-copy">{featuredEvent?.category ?? "Community meetup"} <span className="px-1 text-primary">·</span> {featuredEvent?.area ?? "Lagos"}</p>
+              <p className="font-mono text-[9px] uppercase tracking-wide text-dap-feature-copy">{featuredEvent?.category ?? "Community meetup"} <span className="px-1 text-primary">·</span> {featuredEvent?.area ?? content.cityName}</p>
               <h2 className="mt-2 text-3xl font-bold leading-tight">{featuredEvent?.title ?? "Your next conversation starts here"}</h2>
               <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
                 <span className="flex items-center gap-1.5 font-mono text-[9px]"><CalendarDays size={14} /> {featuredEvent?.dateShort ?? "LAGOS"} · {featuredEvent?.time ?? "SOON"}</span>
@@ -215,7 +218,7 @@ export function PublicHome() {
           </div>
           <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex gap-2 overflow-x-auto pb-1" aria-label="Filter by meetup type">{categoryOptions.map((option) => <Button key={option} variant={category === option ? "secondary" : "outline"} size="sm" className="shrink-0" aria-pressed={category === option} onClick={() => setCategory(option)}>{option}</Button>)}</div>
-            <label className="flex min-h-9 shrink-0 items-center gap-2 border-2 border-foreground bg-card px-2 text-xs"><MapPin size={14} /><select className="max-w-36 bg-transparent outline-none" value={area} onChange={(event) => setArea(event.target.value)}>{areaOptions.map((option) => <option key={option}>{option}</option>)}</select></label>
+            <label className="flex min-h-9 shrink-0 items-center gap-2 border-2 border-foreground bg-card px-2 text-xs"><MapPin size={14} /><select className="max-w-36 bg-transparent outline-none" value={areaOptions.includes(area) ? area : areaFilterAll} onChange={(event) => setArea(event.target.value)}>{areaOptions.map((option) => <option key={option}>{option}</option>)}</select></label>
           </div>
           {visibleEvents.length ? <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {visibleEvents.map((event) => <Card key={event.id} className="overflow-hidden shadow-[4px_4px_0_var(--foreground)]">
@@ -230,13 +233,37 @@ export function PublicHome() {
                 <div className="flex min-h-9 items-center justify-between gap-2 border-t border-dap-border-soft pt-2"><span className="flex items-center gap-1 text-[9px] text-muted-foreground"><Clock3 size={13} />{event.time}</span><Button variant="ghost" size="sm" onClick={() => openTickets(event)}>from {formatNaira(Math.min(...event.ticketTiers.map((tier) => tier.price)))} <ArrowRight size={13} /></Button></div>
               </div>
             </Card>)}
-          </div> : <div className="mt-4 flex min-h-48 flex-col items-center justify-center gap-3 border-2 border-dashed border-dap-text-soft text-center text-muted-foreground"><Search size={21} /><p className="text-xs">No experiences found. Try another activity or area.</p><Button variant="ghost" size="sm" onClick={() => { setQuery(""); setCategory("All experiences"); setArea("All Lagos"); }}>Clear filters</Button></div>}
+          </div> : <div className="mt-4 flex min-h-48 flex-col items-center justify-center gap-3 border-2 border-dashed border-dap-text-soft text-center text-muted-foreground"><Search size={21} /><p className="text-xs">No experiences found. Try another activity or area.</p><Button variant="ghost" size="sm" onClick={() => { setQuery(""); setCategory("All experiences"); setArea(areaFilterAll); }}>Clear filters</Button></div>}
         </section>
 
         <section id="for-pros" className="mt-14 grid gap-4 border-2 border-foreground bg-secondary p-4 shadow-[4px_4px_0_var(--foreground)] sm:grid-cols-[48px_1fr_auto] sm:items-center sm:p-6">
           <span className="grid size-11 place-items-center border-2 border-foreground bg-primary"><Languages size={21} /></span>
           <div><p className="font-mono text-[8px] text-muted-foreground">{content.proEyebrow}</p><h2 className="mt-1 text-xl font-bold leading-tight">{content.proTitle}<br /><em className="font-serif font-semibold">{content.proEmphasis}</em></h2><p className="mt-1 text-[10px] text-muted-foreground">{content.proDescription}</p></div>
-          <Button asChild variant="accent" size="sm"><a href="mailto:bonjour@parleandsip.com?subject=Create%20with%20Parle%20%26%20Sip">{content.proCta} <ArrowRight size={14} /></a></Button>
+          <Button asChild variant="accent" size="sm"><a href={`mailto:${content.contactEmail}?subject=Create%20with%20Parle%20%26%20Sip`}>{content.proCta} <ArrowRight size={14} /></a></Button>
+        </section>
+
+        <section id="contact" className="mt-14 scroll-mt-5" aria-labelledby="contact-title">
+          <p className="flex items-center gap-2 font-mono text-[9px] tracking-wider text-muted-foreground"><span className="size-2 border border-foreground bg-accent" />CONTACT</p>
+          <h2 id="contact-title" className="mt-2 text-[28px] font-bold leading-tight tracking-tight sm:text-3xl">Say hello.</h2>
+          <p className="mt-2 max-w-xl text-xs leading-5 text-muted-foreground">Questions about a seat, a collaboration, or the next gathering. Write, message, or find us on social.</p>
+          <div className="mt-5 grid gap-3 sm:grid-cols-2">
+            <a className="flex items-center gap-3 border-2 border-foreground bg-card p-4 shadow-[3px_3px_0_var(--foreground)]" href={`mailto:${content.contactEmail}`}>
+              <span className="grid size-10 shrink-0 place-items-center border-2 border-foreground bg-primary"><Mail size={18} /></span>
+              <span><span className="block font-mono text-[8px] tracking-wide text-muted-foreground">EMAIL</span><strong className="mt-1 block text-sm">{content.contactEmail}</strong></span>
+            </a>
+            <a className="flex items-center gap-3 border-2 border-foreground bg-card p-4 shadow-[3px_3px_0_var(--foreground)]" href={`https://wa.me/${content.contactWhatsapp.replace(/\D/g, "")}`} target="_blank" rel="noreferrer">
+              <span className="grid size-10 shrink-0 place-items-center border-2 border-foreground bg-secondary text-xs font-bold">WA</span>
+              <span><span className="block font-mono text-[8px] tracking-wide text-muted-foreground">WHATSAPP</span><strong className="mt-1 block text-sm">{content.contactWhatsapp}</strong></span>
+            </a>
+            <a className="flex items-center gap-3 border-2 border-foreground bg-card p-4 shadow-[3px_3px_0_var(--foreground)]" href={`https://www.instagram.com/${content.instagramHandle.replace(/^@/, "")}/`} target="_blank" rel="noreferrer">
+              <span className="grid size-10 shrink-0 place-items-center border-2 border-foreground bg-accent text-[10px] font-bold">IG</span>
+              <span><span className="block font-mono text-[8px] tracking-wide text-muted-foreground">INSTAGRAM</span><strong className="mt-1 block text-sm">@{content.instagramHandle.replace(/^@/, "")}</strong></span>
+            </a>
+            <a className="flex items-center gap-3 border-2 border-foreground bg-card p-4 shadow-[3px_3px_0_var(--foreground)]" href={`https://www.tiktok.com/@${encodeURIComponent(content.tiktokHandle.replace(/^@/, ""))}`} target="_blank" rel="noreferrer">
+              <span className="grid size-10 shrink-0 place-items-center border-2 border-foreground bg-foreground text-[10px] font-bold text-card">TT</span>
+              <span><span className="block font-mono text-[8px] tracking-wide text-muted-foreground">TIKTOK</span><strong className="mt-1 block text-sm">@{content.tiktokHandle.replace(/^@/, "")}</strong></span>
+            </a>
+          </div>
         </section>
 
         <footer className="mt-10 flex min-h-20 flex-wrap items-center gap-3 border-t-2 border-foreground py-4">
