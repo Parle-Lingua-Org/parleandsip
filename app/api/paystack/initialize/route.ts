@@ -48,7 +48,11 @@ export async function POST(request: Request) {
     const order = Array.isArray(createdOrder) ? createdOrder[0] : createdOrder;
     if (!order?.order_id || !order?.public_reference) throw new Error("Unable to create the ticket reservation.");
 
-    const { error: referenceError } = await admin.from("ticket_orders").update({ payment_reference: order.public_reference }).eq("id", order.order_id);
+    const { error: referenceError } = await admin
+      .from("ticket_orders")
+      .update({ payment_reference: order.public_reference })
+      .eq("id", order.order_id)
+      .is("payment_reference", null);
     if (referenceError) throw referenceError;
 
     const paystackResponse = await fetch("https://api.paystack.co/transaction/initialize", {
@@ -59,7 +63,7 @@ export async function POST(request: Request) {
         amount: Math.round(Number(order.subtotal_ngn) * 100),
         currency: "NGN",
         reference: order.public_reference,
-        callback_url: `${siteUrl.replace(/\/$/, "")}/payment/return?reference=${encodeURIComponent(order.public_reference)}`,
+        callback_url: `${siteUrl.replace(/\/$/, "")}/payment/return`,
         metadata: { order_id: order.order_id, event_title: event.title },
       }),
       cache: "no-store",

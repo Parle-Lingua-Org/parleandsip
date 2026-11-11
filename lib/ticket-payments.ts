@@ -1,6 +1,5 @@
 import "server-only";
 
-import { randomBytes, randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import QRCode from "qrcode";
@@ -11,8 +10,55 @@ import { createAdminClient } from "@/lib/supabase/admin";
 type PaystackPayment = {
   reference: string;
   amount: number;
+  requested: number;
+  fees: number;
   currency: string;
 };
+
+type PaystackVerifyData = {
+  status?: string;
+  reference?: string;
+  amount?: number;
+  requested_amount?: number;
+  fees?: number;
+  currency?: string;
+};
+
+export type VerifiedPaystackCharge =
+  | { state: "pending"; status: string }
+  | PaystackPayment & { state: "paid" };
+
+type IssuedTicket = {
+  ticket_number: number;
+  ticket_code: string;
+  ticket_name: string;
+};
+
+type FulfillmentResult = {
+  order_id: string;
+  public_reference: string;
+  buyer_name: string;
+  buyer_email: string;
+  email_status: string;
+  send_email: boolean;
+  event_title: string;
+  starts_at: string;
+  venue_name: string;
+  area: string;
+  ticket_count: number;
+  tickets: IssuedTicket[];
+};
+
+export class PaymentFulfillmentBusy extends Error {
+  constructor() {
+    super("Ticket email is already being delivered.");
+    this.name = "PaymentFulfillmentBusy";
+  }
+}
+
+export function isPaymentFulfillmentBusy(reason: unknown): reason is PaymentFulfillmentBusy {
+  return reason instanceof PaymentFulfillmentBusy || (reason instanceof Error && reason.name === "PaymentFulfillmentBusy");
+}
 
 function escapeHtml(value: string) {
   return value.replace(/[&<>"']/g, (character) => ({
@@ -94,92 +140,87 @@ async function sendTicketEmail(order: any, event: any, ticketCodes: any[]) {
   if (error) throw new Error(error.message);
 }
 
+function paymentCoversOrder(amount: number, requested: number, fees: number) {
+  return Number.isInteger(amount)
+    && Number.isInteger(requested)
+    && Number.isInteger(fees)
+    && fees >= 0
+    && requested > 0
+    && amount >= requested
+    && (amount === requested || amount === requested + fees);
+}
+
+export async function verifyPaystackCharge(reference: string): Promise<VerifiedPaystackCharge> {
+  const secret = process.env.PAYSTACK_SECRET_KEY;
+  if (!secret) throw new Error("Payment verification is not configured.");
+  if (!reference || reference.length > 120) throw new Error("A valid payment reference is required.");
+
+  const response = await fetch(`https://api.paystack.co/transaction/verify/${encodeURIComponent(reference)}`, {
+    headers: { authorization: `Bearer ${secret}` },
+    cache: "no-store",
+  });
+  const result = await response.json() as { status?: boolean; message?: string; data?: PaystackVerifyData };
+  if (!response.ok || !result.status || !result.data) throw new Error(result.message ?? "Unable to verify this payment.");
+  if (result.data.status !== "success") return { state: "pending", status: result.data.status ?? "pending" };
+
+  const amount = Number(result.data.amount);
+  const fees = result.data.fees == null ? 0 : Number(result.data.fees);
+  const requested = result.data.requested_amount == null ? amount : Number(result.data.requested_amount);
+  const confirmedReference = result.data.reference ?? "";
+  if (confirmedReference !== reference) throw new Error("Payment reference does not match an order.");
+  if (!paymentCoversOrder(amount, requested, fees)) throw new Error("Payment amount or currency does not match the order.");
+
+  return { state: "paid", reference: confirmedReference, amount, requested, fees, currency: result.data.currency ?? "" };
+}
+
 export async function finalizePaystackPayment(payment: PaystackPayment) {
-  const admin = createAdminClient();
-  const { data: order, error: orderError } = await admin
-    .from("ticket_orders")
-    .select("id, public_reference, event_id, buyer_name, buyer_email, status, subtotal_ngn, email_status, events(title, starts_at, venue_name, area), ticket_order_items(id, ticket_name, quantity)")
-    .eq("payment_reference", payment.reference)
-    .single();
-  if (orderError || !order) throw new Error("Payment reference does not match an order.");
-  if (payment.currency !== "NGN" || payment.amount !== Math.round(Number(order.subtotal_ngn) * 100)) {
+  if (!payment.reference || payment.reference.length > 120 || !paymentCoversOrder(payment.amount, payment.requested, payment.fees)) {
     throw new Error("Payment amount or currency does not match the order.");
   }
 
-  if (order.status === "pending") {
-    const { data: paidOrder, error: updateError } = await admin
-      .from("ticket_orders")
-      .update({ status: "paid", paid_at: new Date().toISOString() })
-      .eq("id", order.id)
-      .eq("status", "pending")
-      .select("id")
-      .maybeSingle();
-    if (updateError) throw new Error(updateError.message);
-    if (!paidOrder) {
-      const { data: refreshed } = await admin.from("ticket_orders").select("status").eq("id", order.id).single();
-      if (refreshed?.status !== "paid") throw new Error("Order is not in a payable state.");
-    }
-  } else if (order.status !== "paid") {
-    throw new Error("Order is not in a payable state.");
+  const admin = createAdminClient();
+  const { data, error } = await admin.rpc("fulfill_paid_ticket_order", {
+    p_reference: payment.reference,
+    p_amount_kobo: payment.amount,
+    p_requested_kobo: payment.requested,
+    p_fees_kobo: payment.fees,
+    p_currency: payment.currency,
+  });
+  if (error) throw new Error(error.message);
+  const order = (typeof data === "string" ? JSON.parse(data) : data) as FulfillmentResult | null;
+  if (!order?.order_id || !order.tickets?.length) throw new Error("Unable to issue tickets for this order.");
+
+  if (!order.send_email) {
+    if (order.email_status === "sending") throw new PaymentFulfillmentBusy();
+    return { orderReference: order.public_reference, ticketCount: order.ticket_count, emailStatus: order.email_status };
   }
 
-  const { data: existingTickets, error: ticketsError } = await admin
-    .from("ticket_codes")
-    .select("ticket_number")
-    .eq("order_id", order.id);
-  if (ticketsError) throw new Error(ticketsError.message);
-  const existingNumbers = new Set((existingTickets ?? []).map((ticket) => ticket.ticket_number));
-  const ticketRows: { order_id: string; order_item_id: string; event_id: string; ticket_number: number; ticket_code: string; ticket_name: string }[] = [];
-  let ticketNumber = 0;
-  for (const item of order.ticket_order_items ?? []) {
-    for (let itemNumber = 0; itemNumber < item.quantity; itemNumber += 1) {
-      ticketNumber += 1;
-      if (existingNumbers.has(ticketNumber)) continue;
-      ticketRows.push({
-        order_id: order.id,
-        order_item_id: item.id,
-        event_id: order.event_id,
-        ticket_number: ticketNumber,
-        ticket_code: randomBytes(32).toString("base64url"),
-        ticket_name: item.ticket_name,
-      });
-    }
-  }
-  if (ticketRows.length) {
-    const { error: insertError } = await admin.from("ticket_codes").upsert(ticketRows, { onConflict: "order_id,ticket_number", ignoreDuplicates: true });
-    if (insertError) throw new Error(insertError.message);
-  }
-
-  const { data: allTickets, error: allTicketsError } = await admin
-    .from("ticket_codes")
-    .select("ticket_number, ticket_code, ticket_name")
-    .eq("order_id", order.id)
-    .order("ticket_number");
-  if (allTicketsError || !allTickets?.length) throw new Error("Unable to issue tickets for this order.");
-
-  const { data: emailClaim, error: claimError } = await admin
-    .from("ticket_orders")
-    .update({ email_status: "sending", email_error: null })
-    .eq("id", order.id)
-    .in("email_status", ["pending", "failed"])
-    .select("id")
-    .maybeSingle();
-  if (claimError) throw new Error(claimError.message);
-  if (!emailClaim) {
-    const { data: current } = await admin.from("ticket_orders").select("email_status").eq("id", order.id).single();
-    return { orderReference: order.public_reference, ticketCount: allTickets.length, emailStatus: current?.email_status ?? "sending" };
-  }
-
+  let delivered = false;
   try {
-    const event = Array.isArray(order.events) ? order.events[0] : order.events;
-    if (!event) throw new Error("Event details are missing for this ticket order.");
-    await sendTicketEmail(order, event, allTickets);
-    const { error: sentError } = await admin.from("ticket_orders").update({ email_status: "sent", email_sent_at: new Date().toISOString(), email_error: null }).eq("id", order.id);
+    await sendTicketEmail(
+      order,
+      { title: order.event_title, starts_at: order.starts_at, venue_name: order.venue_name, area: order.area },
+      order.tickets,
+    );
+    delivered = true;
+    const { error: sentError } = await admin.rpc("complete_ticket_email", {
+      p_order_id: order.order_id,
+      p_status: "sent",
+      p_error: null,
+    });
     if (sentError) throw new Error(sentError.message);
-    return { orderReference: order.public_reference, ticketCount: allTickets.length, emailStatus: "sent" };
+    return { orderReference: order.public_reference, ticketCount: order.ticket_count, emailStatus: "sent" };
   } catch (reason) {
-    const message = reason instanceof Error ? reason.message : "Unable to deliver ticket email.";
-    await admin.from("ticket_orders").update({ email_status: "failed", email_error: message.slice(0, 500) }).eq("id", order.id);
+    if (!delivered) {
+      const message = reason instanceof Error ? reason.message : "Unable to deliver ticket email.";
+      const { error: failedError } = await admin.rpc("complete_ticket_email", {
+        p_order_id: order.order_id,
+        p_status: "failed",
+        p_error: message.slice(0, 500),
+      });
+      if (failedError) throw new Error(failedError.message);
+      return { orderReference: order.public_reference, ticketCount: order.ticket_count, emailStatus: "failed" };
+    }
     throw reason;
   }
 }

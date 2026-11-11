@@ -80,17 +80,24 @@ create table if not exists public.ticket_orders (
   expires_at timestamptz not null default (now() + interval '15 minutes'),
   payment_reference text unique,
   paid_at timestamptz,
+  amount_paid_kobo integer,
   email_status text not null default 'pending' check (email_status in ('pending', 'sending', 'sent', 'failed')),
   email_sent_at timestamptz,
+  email_claimed_at timestamptz,
   email_error text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
 
 alter table public.ticket_orders add column if not exists paid_at timestamptz;
+alter table public.ticket_orders add column if not exists amount_paid_kobo integer;
 alter table public.ticket_orders add column if not exists email_status text not null default 'pending';
 alter table public.ticket_orders add column if not exists email_sent_at timestamptz;
+alter table public.ticket_orders add column if not exists email_claimed_at timestamptz;
 alter table public.ticket_orders add column if not exists email_error text;
+alter table public.ticket_orders drop constraint if exists ticket_orders_email_status_check;
+alter table public.ticket_orders add constraint ticket_orders_email_status_check
+  check (email_status in ('pending', 'sending', 'sent', 'failed'));
 
 create table if not exists public.ticket_order_items (
   id uuid primary key default gen_random_uuid(),
@@ -307,9 +314,9 @@ begin
 
   v_reference := 'PAS-' || upper(substr(replace(gen_random_uuid()::text, '-', ''), 1, 10));
   insert into public.ticket_orders (
-    public_reference, event_id, buyer_user_id, buyer_name, buyer_email, status, currency_code
+    public_reference, payment_reference, event_id, buyer_user_id, buyer_name, buyer_email, status, currency_code
   ) values (
-    v_reference, p_event_id, auth.uid(), trim(p_buyer_name), lower(trim(p_buyer_email)), 'pending', 'NGN'
+    v_reference, v_reference, p_event_id, auth.uid(), trim(p_buyer_name), lower(trim(p_buyer_email)), 'pending', 'NGN'
   ) returning id into v_order_id;
 
   for v_item in
@@ -366,6 +373,227 @@ begin
   where id = v_order_id;
 
   return query select v_order_id, v_reference, v_subtotal, 'NGN'::text;
+end;
+$$;
+
+-- One transaction: lock the order, match the paid amount to the line items, and insert missing ticket codes.
+-- Email delivery stays outside this function so a slow send cannot roll the tickets back.
+drop function if exists public.fulfill_paid_ticket_order(text, integer, text);
+
+create or replace function public.fulfill_paid_ticket_order(
+  p_reference text,
+  p_amount_kobo integer,
+  p_requested_kobo integer,
+  p_fees_kobo integer,
+  p_currency text
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  v_reference text := trim(p_reference);
+  v_order public.ticket_orders%rowtype;
+  v_event public.events%rowtype;
+  v_item record;
+  v_ticket_number integer := 0;
+  v_slot integer;
+  v_tickets jsonb;
+  v_email_status text;
+  v_send boolean := false;
+  v_updated integer := 0;
+  v_lines_ngn numeric(12, 2);
+  v_due_kobo integer;
+begin
+  if v_reference is null or length(v_reference) < 4 or length(v_reference) > 120 then
+    raise exception 'A valid payment reference is required.' using errcode = '22023';
+  end if;
+
+  begin
+    select *
+    into strict v_order
+    from public.ticket_orders
+    where payment_reference = v_reference
+       or public_reference = v_reference
+    for update;
+  exception
+    when no_data_found then
+      raise exception 'Payment reference does not match an order.' using errcode = 'P0002';
+    when too_many_rows then
+      raise exception 'Payment reference matches more than one order.' using errcode = '21000';
+  end;
+
+  select coalesce(sum(quantity * unit_price_ngn), 0)
+  into v_lines_ngn
+  from public.ticket_order_items
+  where order_id = v_order.id;
+  v_due_kobo := round(v_lines_ngn * 100)::integer;
+
+  -- The charged amount must cover the ticket lines exactly.
+  -- A higher charge is accepted only when the extra is Paystack's reported fee.
+  if v_due_kobo <= 0
+     or v_due_kobo is distinct from round(v_order.subtotal_ngn * 100)::integer
+     or p_currency is null
+     or upper(trim(p_currency)) <> 'NGN'
+     or p_requested_kobo is distinct from v_due_kobo
+     or p_fees_kobo is null
+     or p_fees_kobo < 0
+     or p_amount_kobo is null
+     or p_amount_kobo < v_due_kobo
+     or (
+       p_amount_kobo is distinct from v_due_kobo
+       and p_amount_kobo is distinct from (v_due_kobo + p_fees_kobo)
+     )
+  then
+    raise exception 'Payment amount or currency does not match the order.' using errcode = '22023';
+  end if;
+  if v_order.status = 'refunded' then
+    raise exception 'Order is not in a payable state.' using errcode = '22023';
+  end if;
+
+  -- Inventory is released when a pending order expires or is cancelled.
+  -- A confirmed charge still owns those seats, so put the hold back once.
+  if v_order.status in ('cancelled', 'expired') then
+    update public.ticket_tiers as tiers
+    set quantity_sold = tiers.quantity_sold + items.quantity
+    from (
+      select ticket_tier_id, sum(quantity)::integer as quantity
+      from public.ticket_order_items
+      where order_id = v_order.id and ticket_tier_id is not null
+      group by ticket_tier_id
+    ) as items
+    where items.ticket_tier_id = tiers.id;
+  end if;
+
+  update public.ticket_orders
+  set status = 'paid',
+      paid_at = coalesce(paid_at, now()),
+      payment_reference = coalesce(payment_reference, v_reference),
+      amount_paid_kobo = p_amount_kobo
+  where id = v_order.id
+    and status is distinct from 'paid';
+
+  update public.ticket_orders
+  set amount_paid_kobo = p_amount_kobo
+  where id = v_order.id
+    and amount_paid_kobo is null;
+
+  update public.ticket_orders
+  set payment_reference = v_reference
+  where id = v_order.id
+    and payment_reference is null;
+
+  for v_item in
+    select id, ticket_name, quantity
+    from public.ticket_order_items
+    where order_id = v_order.id
+    order by created_at asc, id asc
+  loop
+    for v_slot in 1..v_item.quantity loop
+      v_ticket_number := v_ticket_number + 1;
+      insert into public.ticket_codes (
+        order_id, order_item_id, event_id, ticket_number, ticket_code, ticket_name
+      ) values (
+        v_order.id,
+        v_item.id,
+        v_order.event_id,
+        v_ticket_number,
+        replace(gen_random_uuid()::text, '-', '') || replace(gen_random_uuid()::text, '-', ''),
+        v_item.ticket_name
+      )
+      on conflict (order_id, ticket_number) do nothing;
+    end loop;
+  end loop;
+
+  select coalesce(
+    jsonb_agg(
+      jsonb_build_object(
+        'ticket_number', codes.ticket_number,
+        'ticket_code', codes.ticket_code,
+        'ticket_name', codes.ticket_name
+      )
+      order by codes.ticket_number
+    ),
+    '[]'::jsonb
+  )
+  into v_tickets
+  from public.ticket_codes as codes
+  where codes.order_id = v_order.id;
+
+  if v_tickets is null or jsonb_array_length(v_tickets) = 0 then
+    raise exception 'Unable to issue tickets for this order.' using errcode = 'P0001';
+  end if;
+
+  -- Only one caller claims delivery. A crashed claim can be taken again after 5 minutes.
+  update public.ticket_orders
+  set email_status = 'sending',
+      email_error = null,
+      email_claimed_at = now()
+  where id = v_order.id
+    and (
+      email_status in ('pending', 'failed')
+      or (
+        email_status = 'sending'
+        and (email_claimed_at is null or email_claimed_at < now() - interval '5 minutes')
+      )
+    );
+  get diagnostics v_updated = row_count;
+  v_send := v_updated > 0;
+
+  select email_status into v_email_status
+  from public.ticket_orders
+  where id = v_order.id;
+
+  select * into v_event from public.events where id = v_order.event_id;
+  if not found then
+    raise exception 'Event details are missing for this ticket order.' using errcode = 'P0002';
+  end if;
+
+  return jsonb_build_object(
+    'order_id', v_order.id,
+    'public_reference', v_order.public_reference,
+    'buyer_name', v_order.buyer_name,
+    'buyer_email', v_order.buyer_email,
+    'email_status', v_email_status,
+    'send_email', v_send,
+    'event_title', v_event.title,
+    'starts_at', v_event.starts_at,
+    'venue_name', v_event.venue_name,
+    'area', v_event.area,
+    'ticket_count', jsonb_array_length(v_tickets),
+    'tickets', v_tickets
+  );
+end;
+$$;
+
+create or replace function public.complete_ticket_email(
+  p_order_id uuid,
+  p_status text,
+  p_error text
+)
+returns void
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+begin
+  if p_status = 'sent' then
+    update public.ticket_orders
+    set email_status = 'sent',
+        email_sent_at = coalesce(email_sent_at, now()),
+        email_error = null
+    where id = p_order_id
+      and email_status in ('sending', 'failed');
+  elsif p_status = 'failed' then
+    update public.ticket_orders
+    set email_status = 'failed',
+        email_error = left(coalesce(p_error, 'Unable to deliver ticket email.'), 500)
+    where id = p_order_id
+      and email_status = 'sending';
+  else
+    raise exception 'Unsupported email status.' using errcode = '22023';
+  end if;
 end;
 $$;
 
@@ -643,7 +871,11 @@ grant insert, update, delete on public.ticket_order_items to authenticated;
 revoke all on function public.is_admin() from public;
 grant execute on function public.is_admin() to authenticated;
 revoke all on function public.create_ticket_order(uuid, text, text, jsonb) from public;
-grant execute on function public.create_ticket_order(uuid, text, text, jsonb) to anon, authenticated;
+grant execute on function public.create_ticket_order(uuid, text, text, jsonb) to anon, authenticated, service_role;
+revoke all on function public.fulfill_paid_ticket_order(text, integer, integer, integer, text) from public, anon, authenticated;
+grant execute on function public.fulfill_paid_ticket_order(text, integer, integer, integer, text) to service_role;
+revoke all on function public.complete_ticket_email(uuid, text, text) from public, anon, authenticated;
+grant execute on function public.complete_ticket_email(uuid, text, text) to service_role;
 revoke all on function public.expire_pending_ticket_orders() from public;
 grant execute on function public.expire_pending_ticket_orders() to authenticated;
 revoke all on function public.admin_check_in_ticket(text) from public;

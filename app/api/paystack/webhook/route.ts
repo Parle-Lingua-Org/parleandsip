@@ -1,5 +1,5 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
-import { finalizePaystackPayment } from "@/lib/ticket-payments";
+import { finalizePaystackPayment, isPaymentFulfillmentBusy, verifyPaystackCharge } from "@/lib/ticket-payments";
 
 export const runtime = "nodejs";
 
@@ -28,15 +28,30 @@ export async function POST(request: Request) {
     return Response.json({ error: "Invalid webhook payload." }, { status: 400 });
   }
   if (payload.event !== "charge.success" || !payload.data?.reference) return Response.json({ received: true });
+  if (payload.data.status && payload.data.status !== "success") return Response.json({ received: true });
 
   try {
-    const result = await finalizePaystackPayment({
-      reference: payload.data.reference,
-      amount: Number(payload.data.amount),
-      currency: payload.data.currency ?? "",
-    });
+    const charge = await verifyPaystackCharge(payload.data.reference);
+    if (charge.state === "pending") return Response.json({ error: "Paystack has not confirmed this charge." }, { status: 500 });
+
+    const reportedAmount = Number(payload.data.amount);
+    if (Number.isInteger(reportedAmount) && reportedAmount !== charge.amount) {
+      return Response.json({ error: "Payment amount or currency does not match the order." }, { status: 409 });
+    }
+    const reportedCurrency = payload.data.currency?.toUpperCase();
+    if (reportedCurrency && charge.currency && reportedCurrency !== charge.currency.toUpperCase()) {
+      return Response.json({ error: "Payment amount or currency does not match the order." }, { status: 409 });
+    }
+
+    const result = await finalizePaystackPayment(charge);
+    if (result.emailStatus === "failed") {
+      return Response.json({ received: true, error: "Tickets are saved, but the ticket email was not delivered." }, { status: 500 });
+    }
     return Response.json({ received: true, emailStatus: result.emailStatus });
   } catch (reason) {
+    if (isPaymentFulfillmentBusy(reason)) {
+      return Response.json({ error: reason.message }, { status: 503, headers: { "retry-after": "5" } });
+    }
     const message = reason instanceof Error ? reason.message : "Payment fulfillment failed.";
     return Response.json({ error: message }, { status: 500 });
   }

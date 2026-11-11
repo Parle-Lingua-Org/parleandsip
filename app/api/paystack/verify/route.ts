@@ -1,30 +1,24 @@
-import { finalizePaystackPayment } from "@/lib/ticket-payments";
+import { finalizePaystackPayment, isPaymentFulfillmentBusy, verifyPaystackCharge } from "@/lib/ticket-payments";
 
 export const runtime = "nodejs";
 
 export async function GET(request: Request) {
-  const secret = process.env.PAYSTACK_SECRET_KEY;
-  if (!secret) return Response.json({ error: "Payment verification is not configured." }, { status: 503 });
-  const reference = new URL(request.url).searchParams.get("reference");
+  const url = new URL(request.url);
+  const reference = url.searchParams.get("reference") ?? url.searchParams.get("trxref");
   if (!reference || reference.length > 120) return Response.json({ error: "A valid payment reference is required." }, { status: 400 });
 
   try {
-    const response = await fetch(`https://api.paystack.co/transaction/verify/${encodeURIComponent(reference)}`, {
-      headers: { authorization: `Bearer ${secret}` },
-      cache: "no-store",
-    });
-    const result = await response.json() as { status?: boolean; message?: string; data?: { status?: string; reference?: string; amount?: number; currency?: string } };
-    if (!response.ok || !result.status || !result.data) return Response.json({ error: result.message ?? "Unable to verify this payment." }, { status: 502 });
-    if (result.data.status !== "success") return Response.json({ status: result.data.status ?? "pending" }, { status: 202 });
+    const charge = await verifyPaystackCharge(reference);
+    if (charge.state === "pending") return Response.json({ status: charge.status }, { status: 202 });
 
-    const order = await finalizePaystackPayment({
-      reference: result.data.reference ?? reference,
-      amount: Number(result.data.amount),
-      currency: result.data.currency ?? "",
-    });
+    const order = await finalizePaystackPayment(charge);
     return Response.json({ status: "paid", ...order });
   } catch (reason) {
+    if (isPaymentFulfillmentBusy(reason)) {
+      return Response.json({ error: reason.message }, { status: 503, headers: { "retry-after": "5" } });
+    }
     const message = reason instanceof Error ? reason.message : "Payment verification failed.";
-    return Response.json({ error: message }, { status: 500 });
+    const status = message === "Payment verification is not configured." ? 503 : 500;
+    return Response.json({ error: message }, { status });
   }
 }
