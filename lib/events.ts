@@ -113,9 +113,11 @@ export async function saveEvent(input: EventSaveInput, createdBy?: string | null
     }
   }
 
-  const staleTier = (existingTiers ?? []).map((tier) => tier.id).filter((id) => !keepIds.has(id));
-  if (staleTiers.length) {
-    const { error } = await admin.from("ticket_tiers").update({ is_active: false }).in("id", staleTiers);
+  const removedTier = (existingTiers ?? [])
+    .map((tier) => tier.id as string)
+    .filter((id) => !keepIds.has(id));
+  if (removedTier.length) {
+    const { error } = await admin.from("ticket_tiers").update({ is_active: false }).in("id", removedTier);
     if (error) throw new Error(error.message);
   }
 
