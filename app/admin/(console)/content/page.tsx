@@ -8,8 +8,9 @@ import { Card } from "@/components/ui/card";
 import { ImagePicker } from "@/components/ui/image-picker";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import type { SiteContent, SiteTheme } from "@/lib/site-data";
-import { useSiteStore } from "@/lib/site-store";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useAdminEventsQuery, useSaveSiteSettingsMutation, useSiteSettingsQuery } from "@/hooks/use-site-data";
+import { initialSiteData, type SiteContent, type SiteTheme } from "@/lib/site-data";
 
 const themeFields: { key: keyof SiteTheme; label: string; note: string }[] = [
   { key: "background", label: "Page background", note: "Main canvas" },
@@ -41,17 +42,21 @@ const contentSections: { title: string; description: string; fields: { key: keyo
 ];
 
 export default function AdminContentPage() {
-  const { data, ready, updateContent, updateTheme } = useSiteStore();
-  const [contentDraft, setContentDraft] = useState<SiteContent>(data.content);
-  const [themeDraft, setThemeDraft] = useState<SiteTheme>(data.theme);
+  const settingsQuery = useSiteSettingsQuery();
+  const eventsQuery = useAdminEventsQuery();
+  const saveMutation = useSaveSiteSettingsMutation();
+  const [contentDraft, setContentDraft] = useState<SiteContent>(initialSiteData.content);
+  const [themeDraft, setThemeDraft] = useState<SiteTheme>(initialSiteData.theme);
   const [saved, setSaved] = useState(false);
+  const [error, setError] = useState("");
+  const events = eventsQuery.data ?? [];
   const activePalette = palettePresets.find((palette) => (Object.keys(palette.colors) as Array<keyof SiteTheme>).every((key) => palette.colors[key] === themeDraft[key]))?.name ?? "Custom palette";
 
   useEffect(() => {
-    if (!ready) return;
-    setContentDraft(data.content);
-    setThemeDraft(data.theme);
-  }, [data.content, data.theme, ready]);
+    if (!settingsQuery.data) return;
+    setContentDraft(settingsQuery.data.content);
+    setThemeDraft(settingsQuery.data.theme);
+  }, [settingsQuery.data]);
 
   function updateContentField<K extends keyof SiteContent>(key: K, value: SiteContent[K]) {
     setContentDraft((current) => ({ ...current, [key]: value }));
@@ -68,16 +73,31 @@ export default function AdminContentPage() {
     setSaved(false);
   }
 
-  function saveSettings(event: FormEvent<HTMLFormElement>) {
+  async function saveSettings(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    updateContent(contentDraft);
-    updateTheme(themeDraft);
-    setSaved(true);
+    setError("");
+    try {
+      await saveMutation.mutateAsync({ content: contentDraft, theme: themeDraft });
+      setSaved(true);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Unable to save site settings.");
+    }
+  }
+
+  if (settingsQuery.isLoading) {
+    return (
+      <div className="space-y-4">
+        <Skeleton className="h-10 w-56" />
+        <Skeleton className="h-40 w-full" />
+        <Skeleton className="h-64 w-full" />
+      </div>
+    );
   }
 
   return (
-    <form className="space-y-6" onSubmit={saveSettings}>
-      <div className="flex flex-wrap items-end justify-between gap-4"><div><p className="font-mono text-[9px] tracking-wide text-muted-foreground">BRAND, HOMEPAGE & THEME</p><h1 className="mt-1 text-3xl font-bold tracking-tight">Site content</h1><p className="mt-2 max-w-2xl text-xs leading-5 text-muted-foreground">Edit the public header, hero, homepage panels, footer and shared palette. Changes save locally in this browser.</p></div><div className="flex items-center gap-3">{saved && <span role="status" className="flex items-center gap-1 text-xs text-dap-green"><Check size={14} /> Saved</span>}<Button type="submit"><Save size={14} /> Save all changes</Button></div></div>
+    <form className="space-y-6" onSubmit={(event) => void saveSettings(event)}>
+      <div className="flex flex-wrap items-end justify-between gap-4"><div><p className="font-mono text-[9px] tracking-wide text-muted-foreground">SUPABASE · BRAND, HOMEPAGE & THEME</p><h1 className="mt-1 text-3xl font-bold tracking-tight">Site content</h1><p className="mt-2 max-w-2xl text-xs leading-5 text-muted-foreground">Edit the public header, hero, homepage panels, footer and shared palette. Changes save to Supabase for every visitor.</p></div><div className="flex items-center gap-3">{saved && <span role="status" className="flex items-center gap-1 text-xs text-dap-green"><Check size={14} /> Saved</span>}<Button type="submit" disabled={saveMutation.isPending}><Save size={14} /> {saveMutation.isPending ? "Saving…" : "Save all changes"}</Button></div></div>
+      {error ? <p role="alert" className="border-2 border-primary bg-card px-3 py-2 text-xs text-primary">{error}</p> : null}
 
       <Card className="grid gap-5 p-4 shadow-[4px_4px_0_var(--foreground)] md:grid-cols-2 sm:p-6">
         <div><h2 className="font-bold">Logo</h2><p className="mt-1 text-[10px] text-muted-foreground">Upload an image or paste a direct image URL. Leave empty to use the text mark.</p><div className="mt-4"><ImagePicker label="Brand logo" value={contentDraft.logoImage} onChange={(value) => updateContentField("logoImage", value)} maxDimension={512} previewClassName="aspect-square max-w-32" /></div></div>
@@ -86,7 +106,7 @@ export default function AdminContentPage() {
 
       {contentSections.map((section) => <Card key={section.title} className="p-4 shadow-[4px_4px_0_var(--foreground)] sm:p-6">
         <div className="mb-5"><h2 className="text-base font-bold">{section.title}</h2><p className="mt-1 text-[10px] text-muted-foreground">{section.description}</p></div>
-        {section.title === "Hero" && <div className="mb-5 grid gap-5 lg:grid-cols-[minmax(0,1.1fr)_minmax(260px,.9fr)]"><div className="grid content-start gap-3"><ImagePicker label="Featured hero image" value={contentDraft.heroImage} onChange={(value) => updateContentField("heroImage", value)} /></div><label className="grid content-start gap-1.5 text-[10px] font-semibold">Featured event<select className="h-10 border-2 border-input bg-card px-3 text-xs" value={contentDraft.featuredEventId} onChange={(event) => updateContentField("featuredEventId", event.target.value)}>{data.events.map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}</select><span className="text-[9px] font-normal text-muted-foreground">The selected event supplies the featured title and ticket action.</span></label></div>}
+        {section.title === "Hero" && <div className="mb-5 grid gap-5 lg:grid-cols-[minmax(0,1.1fr)_minmax(260px,.9fr)]"><div className="grid content-start gap-3"><ImagePicker label="Featured hero image" value={contentDraft.heroImage} onChange={(value) => updateContentField("heroImage", value)} /></div><label className="grid content-start gap-1.5 text-[10px] font-semibold">Featured event<select className="h-10 border-2 border-input bg-card px-3 text-xs" value={contentDraft.featuredEventId} onChange={(event) => updateContentField("featuredEventId", event.target.value)}>{events.map((item) => <option key={item.id} value={item.slug}>{item.title}</option>)}</select><span className="text-[9px] font-normal text-muted-foreground">Uses the event slug from Supabase for the featured title and ticket action.</span></label></div>}
         <div className="grid gap-x-4 gap-y-4 sm:grid-cols-2">{section.fields.map(({ key, label, multiline }) => <label key={key} className={`grid gap-1.5 text-[10px] font-semibold ${multiline ? "sm:col-span-2" : ""}`}>{label}{multiline ? <Textarea rows={2} value={contentDraft[key]} onChange={(event) => updateContentField(key, event.target.value)} /> : <Input value={contentDraft[key]} onChange={(event) => updateContentField(key, event.target.value)} />}</label>)}</div>
       </Card>)}
 

@@ -6,8 +6,9 @@ import { ArrowRight, CalendarDays, CircleDollarSign, ClipboardList, Ticket, User
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useAdminEventsQuery } from "@/hooks/use-site-data";
 import { formatNaira } from "@/lib/site-data";
-import { useSiteStore } from "@/lib/site-store";
 
 type AdminOrder = {
   id: string;
@@ -20,7 +21,8 @@ type AdminOrder = {
 };
 
 export default function AdminOverviewPage() {
-  const { data } = useSiteStore();
+  const eventsQuery = useAdminEventsQuery();
+  const events = eventsQuery.data ?? [];
   const [orders, setOrders] = useState<AdminOrder[]>([]);
   const [ordersLoading, setOrdersLoading] = useState(true);
   const [ordersError, setOrdersError] = useState("");
@@ -51,7 +53,7 @@ export default function AdminOverviewPage() {
   const totalRevenue = paidOrders.reduce((sum, order) => sum + order.total, 0);
   const ticketCount = paidOrders.reduce((sum, order) => sum + order.quantity, 0);
   const metrics = [
-    { label: "Listed events", value: data.events.length, icon: CalendarDays, note: "Browser draft list" },
+    { label: "Listed events", value: events.length, icon: CalendarDays, note: "From Supabase" },
     { label: "Paid orders", value: paidOrders.length, icon: ClipboardList, note: "From Supabase" },
     { label: "Tickets sold", value: ticketCount, icon: Ticket, note: "From Supabase" },
     { label: "Ticket value", value: formatNaira(totalRevenue), icon: CircleDollarSign, note: "Paid only" },
@@ -64,7 +66,7 @@ export default function AdminOverviewPage() {
           <p className="font-mono text-[9px] tracking-wide text-muted-foreground">YOUR COMMUNITY, AT A GLANCE</p>
           <h1 className="mt-1 text-3xl font-bold tracking-tight">Overview</h1>
         </div>
-        <Badge variant="outline">ORDERS FROM DATABASE</Badge>
+        <Badge variant="outline">LIVE SUPABASE DATA</Badge>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -74,7 +76,7 @@ export default function AdminOverviewPage() {
               <p className="text-[10px] text-muted-foreground">{label}</p>
               <Icon size={16} className="text-dap-green" />
             </div>
-            <p className="mt-3 text-2xl font-bold">{value}</p>
+            {eventsQuery.isLoading || ordersLoading ? <Skeleton className="mt-3 h-8 w-20" /> : <p className="mt-3 text-2xl font-bold">{value}</p>}
             <p className="mt-1 text-[9px] text-muted-foreground">{note}</p>
           </Card>
         ))}
@@ -90,7 +92,7 @@ export default function AdminOverviewPage() {
             <Button asChild size="sm" variant="outline"><Link href="/admin/orders">View all <ArrowRight size={13} /></Link></Button>
           </div>
           {ordersLoading ? (
-            <p className="grid min-h-40 place-items-center font-mono text-xs text-muted-foreground">Loading buyers…</p>
+            <div className="space-y-3 p-4">{Array.from({ length: 4 }).map((_, index) => <Skeleton key={index} className="h-12 w-full" />)}</div>
           ) : ordersError ? (
             <p role="alert" className="grid min-h-40 place-items-center px-5 text-center text-xs">{ordersError}</p>
           ) : paidOrders.length ? (
@@ -120,40 +122,26 @@ export default function AdminOverviewPage() {
           <div className="flex items-center justify-between gap-3 border-b-2 border-foreground p-4">
             <div>
               <h2 className="font-bold">Upcoming meetups</h2>
-              <p className="mt-1 text-[10px] text-muted-foreground">Still loaded from this browser&apos;s local draft list.</p>
+              <p className="mt-1 text-[10px] text-muted-foreground">Events loaded from Supabase.</p>
             </div>
             <Button asChild size="sm"><Link href="/admin/events">Manage <ArrowRight size={13} /></Link></Button>
           </div>
-          <div className="divide-y divide-dap-border-muted">
-            {data.events.slice(0, 5).map((event) => (
-              <div key={event.id} className="flex items-center justify-between gap-3 px-4 py-3">
-                <div className="min-w-0">
-                  <p className="truncate text-xs font-semibold">{event.title}</p>
-                  <p className="mt-1 text-[10px] text-muted-foreground">{event.dateShort} · {event.area} · {event.ticketTiers.length} ticket types</p>
+          {eventsQuery.isLoading ? (
+            <div className="space-y-3 p-4">{Array.from({ length: 4 }).map((_, index) => <Skeleton key={index} className="h-12 w-full" />)}</div>
+          ) : (
+            <div className="divide-y divide-dap-border-muted">
+              {events.slice(0, 5).map((event) => (
+                <div key={event.id} className="flex items-center justify-between gap-3 px-4 py-3">
+                  <div className="min-w-0">
+                    <p className="truncate text-xs font-semibold">{event.title}</p>
+                    <p className="mt-1 text-[10px] text-muted-foreground">{event.dateShort} · {event.area} · {event.ticketTiers.length} ticket types</p>
+                  </div>
+                  <span className="shrink-0 text-[10px] font-semibold">from {formatNaira(event.ticketTiers.length ? Math.min(...event.ticketTiers.map((tier) => tier.price)) : 0)}</span>
                 </div>
-                <span className="shrink-0 text-[10px] font-semibold">from {formatNaira(Math.min(...event.ticketTiers.map((tier) => tier.price)))}</span>
-              </div>
-            ))}
-          </div>
-        </Card>
-      </div>
-
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Card className="flex flex-wrap items-center justify-between gap-4 bg-secondary p-4">
-          <div>
-            <p className="font-mono text-[8px] text-muted-foreground">QUICK ACTION</p>
-            <p className="mt-1 text-sm font-bold">Scan tickets at the door</p>
-            <p className="mt-1 text-[10px] text-muted-foreground">Uses live ticket codes from the database.</p>
-          </div>
-          <Button asChild variant="outline" size="sm"><Link href="/admin/check-in">Open scanner <ArrowRight size={14} /></Link></Button>
-        </Card>
-        <Card className="flex flex-wrap items-center justify-between gap-4 bg-secondary p-4">
-          <div>
-            <p className="font-mono text-[8px] text-muted-foreground">QUICK ACTION</p>
-            <p className="mt-1 text-sm font-bold">Refresh the look of Parle & Sip</p>
-            <p className="mt-1 text-[10px] text-muted-foreground">Site content still saves in this browser for now.</p>
-          </div>
-          <Button asChild variant="outline" size="sm"><Link href="/admin/content">Edit site content <ArrowRight size={14} /></Link></Button>
+              ))}
+              {!events.length && <p className="p-5 text-xs text-muted-foreground">No events in Supabase yet.</p>}
+            </div>
+          )}
         </Card>
       </div>
     </div>

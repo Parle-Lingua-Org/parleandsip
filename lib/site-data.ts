@@ -21,6 +21,7 @@ export type TicketTier = {
   description: string;
   price: number;
   capacity: number;
+  quantitySold?: number;
 };
 
 export type SiteContent = {

@@ -5,7 +5,9 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { CalendarDays, Eye, KeyRound, LayoutDashboard, LogOut, Palette, ScanLine, Stamp, Ticket, UsersRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useSiteStore } from "@/lib/site-store";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useSiteSettingsQuery } from "@/hooks/use-site-data";
+import { initialSiteData } from "@/lib/site-data";
 
 const navigation = [
   { href: "/admin", label: "Overview", icon: LayoutDashboard },
@@ -20,7 +22,8 @@ const navigation = [
 export default function AdminLayout({ children }: { children: ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
-  const { data, ready } = useSiteStore();
+  const settingsQuery = useSiteSettingsQuery();
+  const content = settingsQuery.data?.content ?? initialSiteData.content;
   const [authorized, setAuthorized] = useState(false);
   const [adminEmail, setAdminEmail] = useState("");
 
@@ -50,14 +53,14 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
     router.replace("/admin/login");
   }
 
-  if (!authorized || !ready) return <main className="grid min-h-screen place-items-center bg-background"><p className="font-mono text-xs text-muted-foreground">Opening admin workspace…</p></main>;
+  if (!authorized) return <main className="grid min-h-screen place-items-center bg-background"><p className="font-mono text-xs text-muted-foreground">Opening admin workspace…</p></main>;
 
   return (
     <div className="min-h-screen bg-background text-foreground lg:grid lg:grid-cols-[240px_1fr]">
       <aside className="hidden min-h-screen flex-col border-r-2 border-foreground bg-card lg:flex">
         <Link href="/" className="flex min-h-[76px] items-center gap-2 border-b-2 border-foreground px-6 text-lg font-bold">
-          {data.content.logoImage ? <img src={data.content.logoImage} alt="" className="size-9 border-2 border-foreground object-cover" /> : <span className="grid size-9 place-items-center border-2 border-foreground bg-primary"><UsersRound size={18} /></span>}
-          {data.content.brandName}<span className="-ml-2 text-accent">.</span><span className="ml-auto font-mono text-[8px] font-normal text-muted-foreground">ADMIN</span>
+          {settingsQuery.isLoading ? <Skeleton className="size-9" /> : content.logoImage ? <img src={content.logoImage} alt="" className="size-9 border-2 border-foreground object-cover" /> : <span className="grid size-9 place-items-center border-2 border-foreground bg-primary"><UsersRound size={18} /></span>}
+          {content.brandName}<span className="-ml-2 text-accent">.</span><span className="ml-auto font-mono text-[8px] font-normal text-muted-foreground">ADMIN</span>
         </Link>
         <p className="px-6 pb-2 pt-6 font-mono text-[8px] tracking-wider text-muted-foreground">WORKSPACE</p>
         <nav className="grid gap-1 px-3" aria-label="Admin sections">
@@ -75,7 +78,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
 
       <div className="min-w-0">
         <header className="flex min-h-[68px] items-center justify-between gap-3 border-b-2 border-foreground px-4 sm:px-7">
-          <div className="flex items-center gap-2 lg:hidden"><span className="grid size-8 place-items-center border-2 border-foreground bg-primary"><UsersRound size={16} /></span><span className="font-bold">{data.content.brandName}<span className="text-accent">.</span></span></div>
+          <div className="flex items-center gap-2 lg:hidden"><span className="grid size-8 place-items-center border-2 border-foreground bg-primary"><UsersRound size={16} /></span><span className="font-bold">{content.brandName}<span className="text-accent">.</span></span></div>
           <p className="hidden font-mono text-[9px] tracking-wide text-muted-foreground lg:block">PARLE & SIP / ADMIN / {navigation.find((item) => item.href === pathname)?.label.toUpperCase() ?? "WORKSPACE"}</p>
           <div className="ml-auto flex items-center gap-2"><Button asChild size="sm" variant="outline"><Link href="/"><Eye size={14} /><span className="hidden sm:inline">Preview site</span></Link></Button><Button variant="ghost" size="icon" className="lg:hidden" aria-label="Sign out" onClick={signOut}><LogOut size={15} /></Button></div>
         </header>

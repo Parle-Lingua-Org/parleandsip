@@ -25,8 +25,10 @@ import { Card } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { formatNaira, parseEventAreas, type EventItem } from "@/lib/site-data";
-import { useSiteStore } from "@/lib/site-store";
+import { Skeleton } from "@/components/ui/skeleton";
+import { usePublishedEventsQuery, useSiteSettingsQuery } from "@/hooks/use-site-data";
+import { remainingForTier, type EventRecord } from "@/lib/events-shared";
+import { formatNaira, initialSiteData, parseEventAreas } from "@/lib/site-data";
 import Image from "next/image";
 import LogoUse from "@/app/logo.webp";
 
@@ -34,8 +36,10 @@ const categoryOptions = ["All experiences", "French conversation", "Francophone 
 const createWithFormUrl = "https://docs.google.com/forms/d/1LhlPUi_uVlC41u3JguE9TOTjKlaISiVqs1AbKIi3Q9k/viewform?embedded=true";
 
 export function PublicHome() {
-  const { data } = useSiteStore();
-  const { content } = data;
+  const settingsQuery = useSiteSettingsQuery();
+  const eventsQuery = usePublishedEventsQuery();
+  const content = settingsQuery.data?.content ?? initialSiteData.content;
+  const events = eventsQuery.data ?? [];
   const areaFilterAll = content.areaFilterAll || `All ${content.cityName || "Abuja"}`;
   const areaOptions = [areaFilterAll, ...parseEventAreas(content.eventAreas)];
   const [category, setCategory] = useState("All experiences");
@@ -51,7 +55,7 @@ export function PublicHome() {
   const [feedbackBusy, setFeedbackBusy] = useState(false);
   const [feedbackError, setFeedbackError] = useState("");
   const [feedbackSent, setFeedbackSent] = useState(false);
-  const [selectedEvent, setSelectedEvent] = useState<EventItem | null>(null);
+  const [selectedEvent, setSelectedEvent] = useState<EventRecord | null>(null);
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const [selectedTierId, setSelectedTierId] = useState("");
   const [quantity, setQuantity] = useState(1);
@@ -62,8 +66,8 @@ export function PublicHome() {
   const [checkoutUrl, setCheckoutUrl] = useState("");
   const [checkoutBusy, setCheckoutBusy] = useState(false);
 
-  const featuredEvent = data.events.find((event) => event.id === content.featuredEventId) ?? data.events[0];
-  const visibleEvents = data.events.filter((event) => {
+  const featuredEvent = events.find((event) => event.slug === content.featuredEventId || event.id === content.featuredEventId) ?? events[0];
+  const visibleEvents = events.filter((event) => {
     const categoryMatch = category === "All experiences" || event.category === category;
     const areaMatch = area === areaFilterAll || event.area === area;
     const searchMatch = !query.trim() || `${event.title} ${event.host} ${event.category} ${event.venue} ${event.area} ${event.languages.join(" ")}`.toLowerCase().includes(query.trim().toLowerCase());
@@ -71,19 +75,18 @@ export function PublicHome() {
   });
   const selectedTier = selectedEvent?.ticketTiers.find((tier) => tier.id === selectedTierId) ?? selectedEvent?.ticketTiers[0];
   const eventImages = selectedEvent ? [selectedEvent.image, ...selectedEvent.gallery].filter((image, index, list) => Boolean(image) && list.indexOf(image) === index) : [];
-  const remainingForTier = (event: EventItem, tierId: string) => {
+  const tierRemaining = (event: EventRecord, tierId: string) => {
     const tier = event.ticketTiers.find((item) => item.id === tierId);
-    if (!tier) return 0;
-    const reserved = data.orders.filter((order) => order.eventId === event.id && order.ticketType === tier.name).reduce((sum, order) => sum + order.quantity, 0);
-    return Math.max(0, tier.capacity - reserved);
+    return tier ? remainingForTier(tier) : 0;
   };
-  const selectedTierRemaining = selectedEvent && selectedTier ? remainingForTier(selectedEvent, selectedTier.id) : 0;
+  const selectedTierRemaining = selectedEvent && selectedTier ? remainingForTier(selectedTier) : 0;
   const ticketPrice = selectedTier?.price ?? 0;
+  const loadingHome = settingsQuery.isLoading || eventsQuery.isLoading;
 
-  function openTickets(event: EventItem) {
+  function openTickets(event: EventRecord) {
     setSelectedEvent(event);
     setSelectedImageIndex(0);
-    setSelectedTierId(event.ticketTiers.find((tier) => remainingForTier(event, tier.id) > 0)?.id ?? event.ticketTiers[0]?.id ?? "");
+    setSelectedTierId(event.ticketTiers.find((tier) => remainingForTier(tier) > 0)?.id ?? event.ticketTiers[0]?.id ?? "");
     setQuantity(1);
     setBuyerName("");
     setBuyerEmail("");
@@ -106,7 +109,7 @@ export function PublicHome() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          eventSlug: selectedEvent.id,
+          eventSlug: selectedEvent.slug,
           buyerName: buyerName.trim(),
           buyerEmail: buyerEmail.trim(),
           items: [{ name: selectedTier.name, quantity }],
@@ -207,7 +210,7 @@ export function PublicHome() {
           <Card className="min-h-[190px] bg-card p-4 shadow-[4px_4px_0_var(--foreground)] xl:col-span-3">
             <span className="font-mono text-[8px] tracking-wide text-muted-foreground">{content.calendarTitle}</span>
             <div className="mt-3 grid gap-2">
-              {data.events.slice(0, 3).map((event) => <a key={event.id} className="grid grid-cols-[36px_35px_1fr] items-center gap-2 border-t border-dap-border-soft pt-2 first:border-0 first:pt-0" href="#events">
+              {loadingHome ? Array.from({ length: 3 }).map((_, index) => <div key={index} className="grid grid-cols-[36px_35px_1fr] items-center gap-2 border-t border-dap-border-soft pt-2 first:border-0 first:pt-0"><Skeleton className="h-8 w-9" /><Skeleton className="h-4 w-8" /><Skeleton className="h-4 w-full" /></div>) : events.slice(0, 3).map((event) => <a key={event.id} className="grid grid-cols-[36px_35px_1fr] items-center gap-2 border-t border-dap-border-soft pt-2 first:border-0 first:pt-0" href="#events">
                 <strong className="text-xl leading-none">{event.dateShort.slice(-2)}</strong><span className="font-mono text-[7px] leading-tight text-muted-foreground">{event.dateShort.slice(0, 3)}<br />{event.date.slice(0, 3).toUpperCase()}</span><small className="truncate text-[9px]">{event.title}</small>
               </a>)}
             </div>
@@ -231,20 +234,40 @@ export function PublicHome() {
             <div className="flex gap-2 overflow-x-auto pb-1" aria-label="Filter by meetup type">{categoryOptions.map((option) => <Button key={option} variant={category === option ? "secondary" : "outline"} size="sm" className="shrink-0" aria-pressed={category === option} onClick={() => setCategory(option)}>{option}</Button>)}</div>
             <label className="flex min-h-9 shrink-0 items-center gap-2 border-2 border-foreground bg-card px-2 text-xs"><MapPin size={14} /><select className="max-w-36 bg-transparent outline-none" value={areaOptions.includes(area) ? area : areaFilterAll} onChange={(event) => setArea(event.target.value)}>{areaOptions.map((option) => <option key={option}>{option}</option>)}</select></label>
           </div>
-          {visibleEvents.length ? <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {visibleEvents.map((event) => <Card key={event.id} className="overflow-hidden shadow-[4px_4px_0_var(--foreground)]">
-              <button type="button" aria-label={`View tickets for ${event.title}`} onClick={() => openTickets(event)} className="relative block aspect-[1.65] w-full border-b-2 border-foreground bg-cover bg-center text-left" style={{ backgroundImage: `linear-gradient(180deg,rgb(var(--dap-overlay-rgb)/.03) 35%,rgb(var(--dap-overlay-rgb)/.58)),url("${event.image}")` }}>
-                <Badge className="absolute left-2.5 top-2.5">{event.dateShort}</Badge>{event.label && <Badge variant="outline" className="absolute right-2.5 top-2.5 bg-card">{event.label}</Badge>}
-              </button>
-              <div className="p-3">
-                <p className="font-mono text-[8px] uppercase text-muted-foreground">{event.category}</p>
-                <h3 className="mt-1 min-h-9 text-sm font-bold leading-tight">{event.title}</h3>
-                <p className="mt-1 flex items-start gap-1 text-[10px] text-muted-foreground"><MapPin size={13} className="mt-0.5 shrink-0" />{event.venue} <span className="text-dap-text-soft">· {event.host}</span></p>
-                <div className="flex min-h-9 flex-wrap content-center gap-1.5 py-2">{event.languages.map((language) => <Badge key={language} variant="outline" className="border-dap-border-soft px-1.5 py-0.5 text-[8px]">{language}</Badge>)}</div>
-                <div className="flex min-h-9 items-center justify-between gap-2 border-t border-dap-border-soft pt-2"><span className="flex items-center gap-1 text-[9px] text-muted-foreground"><Clock3 size={13} />{event.time}</span><Button variant="ghost" size="sm" onClick={() => openTickets(event)}>from {formatNaira(Math.min(...event.ticketTiers.map((tier) => tier.price)))} <ArrowRight size={13} /></Button></div>
-              </div>
-            </Card>)}
-          </div> : <div className="mt-4 flex min-h-48 flex-col items-center justify-center gap-3 border-2 border-dashed border-dap-text-soft text-center text-muted-foreground"><Search size={21} /><p className="text-xs">No experiences found. Try another activity or area.</p><Button variant="ghost" size="sm" onClick={() => { setQuery(""); setCategory("All experiences"); setArea(areaFilterAll); }}>Clear filters</Button></div>}
+          {loadingHome ? (
+            <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {Array.from({ length: 6 }).map((_, index) => (
+                <Card key={index} className="overflow-hidden shadow-[4px_4px_0_var(--foreground)]">
+                  <Skeleton className="aspect-[1.65] w-full rounded-none border-0 border-b-2 border-foreground" />
+                  <div className="space-y-2 p-3">
+                    <Skeleton className="h-3 w-24" />
+                    <Skeleton className="h-5 w-48" />
+                    <Skeleton className="h-4 w-32" />
+                    <Skeleton className="h-8 w-full" />
+                  </div>
+                </Card>
+              ))}
+            </div>
+          ) : visibleEvents.length ? (
+            <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {visibleEvents.map((event) => (
+                <Card key={event.id} className="overflow-hidden shadow-[4px_4px_0_var(--foreground)]">
+                  <button type="button" aria-label={`View tickets for ${event.title}`} onClick={() => openTickets(event)} className="relative block aspect-[1.65] w-full border-b-2 border-foreground bg-cover bg-center text-left" style={{ backgroundImage: `linear-gradient(180deg,rgb(var(--dap-overlay-rgb)/.03) 35%,rgb(var(--dap-overlay-rgb)/.58)),url("${event.image}")` }}>
+                    <Badge className="absolute left-2.5 top-2.5">{event.dateShort}</Badge>{event.label && <Badge variant="outline" className="absolute right-2.5 top-2.5 bg-card">{event.label}</Badge>}
+                  </button>
+                  <div className="p-3">
+                    <p className="font-mono text-[8px] uppercase text-muted-foreground">{event.category}</p>
+                    <h3 className="mt-1 min-h-9 text-sm font-bold leading-tight">{event.title}</h3>
+                    <p className="mt-1 flex items-start gap-1 text-[10px] text-muted-foreground"><MapPin size={13} className="mt-0.5 shrink-0" />{event.venue} <span className="text-dap-text-soft">· {event.host}</span></p>
+                    <div className="flex min-h-9 flex-wrap content-center gap-1.5 py-2">{event.languages.map((language) => <Badge key={language} variant="outline" className="border-dap-border-soft px-1.5 py-0.5 text-[8px]">{language}</Badge>)}</div>
+                    <div className="flex min-h-9 items-center justify-between gap-2 border-t border-dap-border-soft pt-2"><span className="flex items-center gap-1 text-[9px] text-muted-foreground"><Clock3 size={13} />{event.time}</span><Button variant="ghost" size="sm" onClick={() => openTickets(event)}>from {formatNaira(Math.min(...event.ticketTiers.map((tier) => tier.price)))} <ArrowRight size={13} /></Button></div>
+                  </div>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <div className="mt-4 flex min-h-48 flex-col items-center justify-center gap-3 border-2 border-dashed border-dap-text-soft text-center text-muted-foreground"><Search size={21} /><p className="text-xs">No experiences found. Try another activity or area.</p><Button variant="ghost" size="sm" onClick={() => { setQuery(""); setCategory("All experiences"); setArea(areaFilterAll); }}>Clear filters</Button></div>
+          )}
         </section>
 
         <section id="for-pros" className="mt-14 grid gap-4 border-2 border-foreground bg-secondary p-4 shadow-[4px_4px_0_var(--foreground)] sm:grid-cols-[48px_1fr_auto] sm:items-center sm:p-6">
@@ -404,7 +427,7 @@ export function PublicHome() {
           </div> : <form className="space-y-4 p-4 sm:p-5" onSubmit={submitCheckout}>
             <div><p className="font-mono text-[8px] uppercase text-muted-foreground">{selectedEvent.category} · {selectedEvent.area}</p><DialogTitle className="mt-1 pr-9 text-xl font-bold leading-tight">{selectedEvent.title}</DialogTitle><DialogDescription className="mt-1 flex items-center gap-1 text-[10px] text-muted-foreground"><MapPin size={13} />{selectedEvent.venue}</DialogDescription></div>
             <fieldset><legend className="mb-2 font-mono text-[8px] text-muted-foreground">PICK YOUR PASS</legend><div className="grid gap-2">
-              {selectedEvent.ticketTiers.map((tier) => { const remaining = remainingForTier(selectedEvent, tier.id); return <button key={tier.id} type="button" disabled={remaining === 0} aria-pressed={selectedTier?.id === tier.id} onClick={() => { setSelectedTierId(tier.id); setQuantity((count) => Math.min(count, Math.max(remaining, 1))); setOrderError(""); }} className={`flex min-h-14 items-center gap-3 border-2 px-3 text-left disabled:cursor-not-allowed disabled:opacity-50 ${selectedTier?.id === tier.id ? "border-foreground bg-success shadow-[2px_2px_0_var(--foreground)]" : "border-dap-border-muted bg-card"}`}><span className="grid size-4 place-items-center rounded-full border border-foreground">{selectedTier?.id === tier.id && <span className="size-2 rounded-full bg-foreground" />}</span><span className="flex-1"><strong className="block text-[10px]">{tier.name}</strong><small className="text-[9px] text-muted-foreground">{tier.description} · {remaining ? `${remaining} left` : "Sold out"}</small></span><strong className="text-xs">{formatNaira(tier.price)}</strong></button>; })}
+              {selectedEvent.ticketTiers.map((tier) => { const remaining = tierRemaining(selectedEvent, tier.id); return <button key={tier.id} type="button" disabled={remaining === 0} aria-pressed={selectedTier?.id === tier.id} onClick={() => { setSelectedTierId(tier.id); setQuantity((count) => Math.min(count, Math.max(remaining, 1))); setOrderError(""); }} className={`flex min-h-14 items-center gap-3 border-2 px-3 text-left disabled:cursor-not-allowed disabled:opacity-50 ${selectedTier?.id === tier.id ? "border-foreground bg-success shadow-[2px_2px_0_var(--foreground)]" : "border-dap-border-muted bg-card"}`}><span className="grid size-4 place-items-center rounded-full border border-foreground">{selectedTier?.id === tier.id && <span className="size-2 rounded-full bg-foreground" />}</span><span className="flex-1"><strong className="block text-[10px]">{tier.name}</strong><small className="text-[9px] text-muted-foreground">{tier.description} · {remaining ? `${remaining} left` : "Sold out"}</small></span><strong className="text-xs">{formatNaira(tier.price)}</strong></button>; })}
             </div></fieldset>
             <div className="flex items-center justify-between border-b border-dap-border-muted pb-3"><div><strong className="block text-[10px]">Tickets</strong><small className="text-[9px] text-muted-foreground">{selectedTierRemaining} available · max 6 per order</small></div><div className="flex items-center gap-3"><Button type="button" variant="outline" size="icon" aria-label="Remove one ticket" disabled={quantity <= 1} onClick={() => setQuantity((count) => Math.max(1, count - 1))}><Minus size={14} /></Button><span aria-live="polite" className="min-w-3 text-center text-xs">{quantity}</span><Button type="button" variant="outline" size="icon" aria-label="Add one ticket" disabled={quantity >= Math.min(6, selectedTierRemaining)} onClick={() => setQuantity((count) => Math.min(6, selectedTierRemaining, count + 1))}><Plus size={14} /></Button></div></div>
             <div className="grid gap-3 sm:grid-cols-2"><label className="grid gap-1 text-[10px] font-semibold">Your name <Input autoComplete="name" required value={buyerName} onChange={(event) => setBuyerName(event.target.value)} /></label><label className="grid gap-1 text-[10px] font-semibold">Email for your ticket <Input autoComplete="email" type="email" required value={buyerEmail} onChange={(event) => setBuyerEmail(event.target.value)} /></label></div>
