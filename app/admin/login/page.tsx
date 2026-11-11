@@ -54,7 +54,7 @@ export default function AdminLoginPage() {
               <Button type="submit" disabled={busy} className="mt-1 w-full">{busy ? "Signing in…" : "Sign in"} <ArrowRight size={15} /></Button>
             </form>
           </Card>
-          <p className="mt-5 text-center text-[9px] leading-4 text-muted-foreground">Create the account in Supabase Auth, then assign its profile the admin role. Passwords are managed by Supabase Auth.</p>
+          <p className="mt-5 text-center text-[9px] leading-4 text-muted-foreground">Sign in with the email and password you received from the admin.</p>
         </div>
         <p className="font-mono text-[8px] tracking-wide text-muted-foreground">PARLE & SIP ADMIN · V1.0</p>
       </section>

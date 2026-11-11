@@ -698,7 +698,7 @@ $$;
 insert into public.site_settings (setting_key, content, theme)
 values (
   'main',
-  '{"brandName":"Parle & Sip","footerLocation":"ABUJA · NIGERIA","footerCurrency":"NGN · ₦ NAIRA","cityName":"Abuja","areaFilterAll":"All Abuja","eventAreas":"Maitama, Wuse, Garki, Asokoro, Jabi, Gwarinpa","heroTitle":"A little French.","heroSecondLine":"A lot to share.","footerText":"Learn. Connect. Experience. Parlez et profitez !"}'::jsonb,
+  '{"brandName":"Parle & Sip","footerLocation":"ABUJA · NIGERIA","footerCurrency":"NGN · ₦ NAIRA","cityName":"Abuja","areaFilterAll":"All Abuja","eventAreas":"Maitama, Wuse, Garki, Asokoro, Jabi, Gwarinpa","heroTitle":"A little French.","heroSecondLine":"A lot to share.","footerText":"Learn. Connect. Experience. Parlez et profitez !","ticketTemplate":{"brandName":"PARLE & SIP","slugTag":"BIGGEST FRENCH GATHERING IN ABUJA","passLabel":"EVENT PASS","qrInstruction":"SHOW THIS QR CODE AT THE DOOR","brandSize":24,"qrSize":132,"qrOffsetY":84,"notchY":250,"showLogoInQr":true,"logoInQrPercent":18}}'::jsonb,
   '{"background":"#f5f6f8","foreground":"#192637","primary":"#9a1f26","secondary":"#e5e9ef","muted":"#edf0f4","mutedForeground":"#526173","accent":"#be8f3f","ring":"#9a1f26","info":"#dce4ef"}'::jsonb
 )
 on conflict (setting_key) do update set
