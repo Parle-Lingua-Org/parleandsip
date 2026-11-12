@@ -12,9 +12,10 @@ import {
   useAdminEventsQuery,
   useDeleteEventMutation,
   useSaveEventMutation,
+  useSaveSiteSettingsMutation,
   useSiteSettingsQuery,
 } from "@/hooks/use-site-data";
-import type { EventRecord } from "@/lib/events-shared";
+import type { EventRecord, SchedulePrecision } from "@/lib/events-shared";
 import { createTicketTiers, formatNaira, parseEventAreas, type TicketTier } from "@/lib/site-data";
 import { imageFileToDataUrl } from "@/lib/image-upload";
 
@@ -24,7 +25,8 @@ type EventDraft = {
   title: string;
   host: string;
   category: string;
-  startsAt: string;
+  startsAt: string | null;
+  schedulePrecision: SchedulePrecision;
   venue: string;
   area: string;
   languages: string[];
@@ -35,11 +37,20 @@ type EventDraft = {
   status: "draft" | "published";
 };
 
-function toLocalInputValue(iso: string) {
+function toLocalInputValue(iso: string | null) {
+  if (!iso) return "";
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return "";
   const local = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
   return local.toISOString().slice(0, 16);
+}
+
+function toMonthInputValue(iso: string | null) {
+  if (!iso) return "";
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "";
+  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
+  return local.toISOString().slice(0, 7);
 }
 
 function newEvent(cityName: string, defaultArea: string): EventDraft {
@@ -52,6 +63,7 @@ function newEvent(cityName: string, defaultArea: string): EventDraft {
     host: "Parle & Sip",
     category: "French conversation",
     startsAt: starts.toISOString(),
+    schedulePrecision: "datetime",
     venue: `Venue name, ${cityName}`,
     area: defaultArea,
     languages: ["French", "English"],
@@ -71,6 +83,7 @@ function fromRecord(event: EventRecord): EventDraft {
     host: event.host,
     category: event.category,
     startsAt: event.startsAt,
+    schedulePrecision: event.schedulePrecision,
     venue: event.venue,
     area: event.area,
     languages: [...event.languages],
@@ -87,7 +100,9 @@ export default function AdminEventsPage() {
   const eventsQuery = useAdminEventsQuery();
   const saveMutation = useSaveEventMutation();
   const deleteMutation = useDeleteEventMutation();
+  const saveSettingsMutation = useSaveSiteSettingsMutation();
   const content = settingsQuery.data?.content;
+  const featuredSlug = content?.featuredEventId || "";
   const areaOptions = parseEventAreas(content?.eventAreas || "");
   const cityName = content?.cityName || "Abuja";
   const defaultArea = areaOptions[0] || cityName;
@@ -96,6 +111,7 @@ export default function AdminEventsPage() {
   const [galleryUrl, setGalleryUrl] = useState("");
   const [uploadError, setUploadError] = useState("");
   const [formError, setFormError] = useState("");
+  const [pickBusy, setPickBusy] = useState(false);
 
   const saved = useMemo(() => saveMutation.isSuccess && !saveMutation.isPending, [saveMutation.isPending, saveMutation.isSuccess]);
 
@@ -122,6 +138,7 @@ export default function AdminEventsPage() {
         host: draft.host,
         category: draft.category,
         startsAt: draft.startsAt,
+        schedulePrecision: draft.schedulePrecision,
         venue: draft.venue,
         area: draft.area,
         languages: draft.languages,
@@ -178,6 +195,41 @@ export default function AdminEventsPage() {
         </p>
       )}
 
+      <Card className="p-4 shadow-[4px_4px_0_var(--foreground)] sm:p-5">
+        <div className="flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <p className="font-mono text-[9px] tracking-wide text-muted-foreground">HOMEPAGE · FEATURED CARD</p>
+            <h2 className="mt-1 text-lg font-bold">This week&apos;s pick</h2>
+            <p className="mt-1 max-w-xl text-[10px] text-muted-foreground">
+              Chooses the large “THIS WEEK&apos;S PICK” card on the public homepage. Leave blank to auto-use the next upcoming event.
+            </p>
+          </div>
+          <label className="grid min-w-[240px] flex-1 gap-1 text-[10px] font-semibold sm:max-w-sm">
+            Featured experience
+            <select
+              className="h-10 border-2 border-input bg-card px-2 text-xs"
+              value={featuredSlug}
+              disabled={pickBusy || saveSettingsMutation.isPending || !events.length}
+              onChange={(event) => {
+                const nextSlug = event.target.value;
+                setPickBusy(true);
+                void saveSettingsMutation
+                  .mutateAsync({ content: { featuredEventId: nextSlug } })
+                  .catch((reason) => setFormError(reason instanceof Error ? reason.message : "Unable to set this week's pick."))
+                  .finally(() => setPickBusy(false));
+              }}
+            >
+              <option value="">Auto (next upcoming)</option>
+              {events.map((event) => (
+                <option key={event.id} value={event.slug}>
+                  {event.title} · {event.dateShort}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+      </Card>
+
       <div className="grid items-start gap-5 xl:grid-cols-[minmax(290px,.78fr)_minmax(0,1.22fr)]">
         <Card className="overflow-hidden shadow-[4px_4px_0_var(--foreground)]">
           <div className="border-b-2 border-foreground p-4">
@@ -190,7 +242,7 @@ export default function AdminEventsPage() {
                 <span className="size-12 shrink-0 border border-foreground bg-cover bg-center" style={{ backgroundImage: event.image ? `url("${event.image}")` : undefined }} />
                 <span className="min-w-0 flex-1">
                   <strong className="block truncate text-xs">{event.title}</strong>
-                  <span className="mt-1 block truncate text-[9px] text-muted-foreground">{event.dateShort} · {event.area} · {event.status}</span>
+                  <span className="mt-1 block truncate text-[9px] text-muted-foreground">{event.dateShort} · {event.area} · {event.status}{featuredSlug === event.slug ? " · THIS WEEK'S PICK" : ""}</span>
                   <span className="mt-1 block text-[9px]">from {formatNaira(event.ticketTiers.length ? Math.min(...event.ticketTiers.map((tier) => tier.price)) : 0)}</span>
                 </span>
               </button>
@@ -221,8 +273,38 @@ export default function AdminEventsPage() {
                   <label className="grid gap-1 text-[10px] font-semibold sm:col-span-2">Experience title<Input required value={draft.title} onChange={(event) => updateDraft("title", event.target.value)} /></label>
                   <label className="grid gap-1 text-[10px] font-semibold">Host<Input value={draft.host} onChange={(event) => updateDraft("host", event.target.value)} /></label>
                   <label className="grid gap-1 text-[10px] font-semibold">Experience type<select className="h-10 border-2 border-input bg-card px-2 text-xs" value={draft.category} onChange={(event) => updateDraft("category", event.target.value)}><option>French conversation</option><option>Francophone culture</option><option>Art & creativity</option><option>Food & gastronomy</option><option>Games & conversation</option></select></label>
-                  <label className="grid gap-1 text-[10px] font-semibold">Starts at<Input type="datetime-local" required value={toLocalInputValue(draft.startsAt)} onChange={(event) => updateDraft("startsAt", new Date(event.target.value).toISOString())} /></label>
+                  <label className="grid gap-1 text-[10px] font-semibold">Schedule<select className="h-10 border-2 border-input bg-card px-2 text-xs" value={draft.schedulePrecision} onChange={(event) => {
+                    const next = event.target.value as SchedulePrecision;
+                    setDraft((current) => current ? { ...current, schedulePrecision: next, startsAt: next === "tbd" ? null : current.startsAt } : current);
+                    saveMutation.reset();
+                    setFormError("");
+                  }}><option value="datetime">Exact date & time</option><option value="month">Month only</option><option value="tbd">TBD</option></select></label>
+                  {draft.schedulePrecision === "datetime" ? (
+                    <label className="grid gap-1 text-[10px] font-semibold">Starts at<Input type="datetime-local" required value={toLocalInputValue(draft.startsAt)} onChange={(event) => updateDraft("startsAt", event.target.value ? new Date(event.target.value).toISOString() : null)} /></label>
+                  ) : draft.schedulePrecision === "month" ? (
+                    <label className="grid gap-1 text-[10px] font-semibold">Month<Input type="month" required value={toMonthInputValue(draft.startsAt)} onChange={(event) => updateDraft("startsAt", event.target.value ? new Date(`${event.target.value}-01T12:00:00`).toISOString() : null)} /></label>
+                  ) : (
+                    <div className="grid content-end gap-1 text-[10px] text-muted-foreground"><p className="font-semibold text-foreground">Date display</p><p>Shows as TBD on the homepage editions list.</p></div>
+                  )}
                   <label className="grid gap-1 text-[10px] font-semibold">Status<select className="h-10 border-2 border-input bg-card px-2 text-xs" value={draft.status} onChange={(event) => updateDraft("status", event.target.value as "draft" | "published")}><option value="published">Published</option><option value="draft">Draft</option></select></label>
+                  <div className="sm:col-span-2">
+                    <Button
+                      type="button"
+                      variant={draft.slug && featuredSlug === draft.slug ? "secondary" : "outline"}
+                      size="sm"
+                      disabled={!draft.slug || pickBusy || saveSettingsMutation.isPending}
+                      onClick={() => {
+                        if (!draft.slug) return;
+                        setPickBusy(true);
+                        void saveSettingsMutation.mutateAsync({ content: { featuredEventId: draft.slug } })
+                          .catch((reason) => setFormError(reason instanceof Error ? reason.message : "Unable to set this week's pick."))
+                          .finally(() => setPickBusy(false));
+                      }}
+                    >
+                      {draft.slug && featuredSlug === draft.slug ? "This week's pick" : "Set as this week's pick"}
+                    </Button>
+                    <p className="mt-1 text-[9px] text-muted-foreground">Controls the large “THIS WEEK'S PICK” card on the homepage.</p>
+                  </div>
                   <label className="grid gap-1 text-[10px] font-semibold">Area<select className="h-10 border-2 border-input bg-card px-2 text-xs" value={areaOptions.includes(draft.area) ? draft.area : defaultArea} onChange={(event) => updateDraft("area", event.target.value)}>{(areaOptions.includes(draft.area) ? areaOptions : [draft.area, ...areaOptions]).filter((area, index, list) => list.indexOf(area) === index).map((area) => <option key={area}>{area}</option>)}</select></label>
                   <label className="grid gap-1 text-[10px] font-semibold sm:col-span-2">Venue<Input value={draft.venue} onChange={(event) => updateDraft("venue", event.target.value)} /></label>
                   <label className="grid gap-1 text-[10px] font-semibold sm:col-span-2">Languages, separated by commas<Input value={draft.languages.join(", ")} onChange={(event) => updateDraft("languages", event.target.value.split(",").map((language) => language.trim()).filter(Boolean))} /></label>

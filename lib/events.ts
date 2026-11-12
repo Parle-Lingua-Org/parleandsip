@@ -5,12 +5,24 @@ import { mapDbEvent, slugify, type DbEventRow, type EventRecord, type EventSaveI
 
 export type { EventSaveInput } from "@/lib/events-shared";
 
-const eventSelect = `
+const eventSelectBase = `
   id, slug, title, summary, host_name, category, starts_at, venue_name, address, area,
   language_tags, main_image_url, listing_label, status,
   ticket_tiers (id, name, description, price_ngn, capacity, quantity_sold, is_active, sort_order),
   event_images (id, image_url, sort_order)
 `;
+
+const eventSelect = `
+  id, slug, title, summary, host_name, category, starts_at, schedule_precision, venue_name, address, area,
+  language_tags, main_image_url, listing_label, status,
+  ticket_tiers (id, name, description, price_ngn, capacity, quantity_sold, is_active, sort_order),
+  event_images (id, image_url, sort_order)
+`;
+
+function isMissingSchedulePrecision(error: { message?: string; code?: string } | null) {
+  if (!error) return false;
+  return error.code === "42703" || /schedule_precision/i.test(error.message || "");
+}
 
 async function requireUniqueSlug(admin: ReturnType<typeof createAdminClient>, slug: string, excludeId?: string) {
   let candidate = slug;
@@ -23,32 +35,49 @@ async function requireUniqueSlug(admin: ReturnType<typeof createAdminClient>, sl
   return `${slug}-${Date.now()}`;
 }
 
-export async function listPublishedEvents(): Promise<EventRecord[]> {
+async function selectEvents(filter: "published" | "admin") {
   const admin = createAdminClient();
-  const { data, error } = await admin
-    .from("events")
-    .select(eventSelect)
-    .eq("status", "published")
-    .order("starts_at", { ascending: true });
-  if (error) throw new Error(error.message);
-  return ((data ?? []) as DbEventRow[]).map(mapDbEvent);
+  const base = admin.from("events").select(eventSelect);
+  const query = filter === "published"
+    ? base.eq("status", "published")
+    : base.neq("status", "cancelled");
+  const first = await query.order("starts_at", { ascending: true, nullsFirst: false });
+  if (!first.error) return (first.data ?? []) as DbEventRow[];
+  if (!isMissingSchedulePrecision(first.error)) throw new Error(first.error.message);
+
+  const fallbackBase = admin.from("events").select(eventSelectBase);
+  const fallbackQuery = filter === "published"
+    ? fallbackBase.eq("status", "published")
+    : fallbackBase.neq("status", "cancelled");
+  const second = await fallbackQuery.order("starts_at", { ascending: true, nullsFirst: false });
+  if (second.error) throw new Error(second.error.message);
+  return (second.data ?? []) as DbEventRow[];
+}
+
+export async function listPublishedEvents(): Promise<EventRecord[]> {
+  return (await selectEvents("published")).map(mapDbEvent);
 }
 
 export async function listAdminEvents(): Promise<EventRecord[]> {
-  const admin = createAdminClient();
-  const { data, error } = await admin
-    .from("events")
-    .select(eventSelect)
-    .neq("status", "cancelled")
-    .order("starts_at", { ascending: true });
-  if (error) throw new Error(error.message);
-  return ((data ?? []) as DbEventRow[]).map(mapDbEvent);
+  return (await selectEvents("admin")).map(mapDbEvent);
 }
 
 export async function saveEvent(input: EventSaveInput, createdBy?: string | null): Promise<EventRecord> {
   const admin = createAdminClient();
-  const startsAt = new Date(input.startsAt);
-  if (Number.isNaN(startsAt.getTime())) throw new Error("Choose a valid event date and time.");
+  const precision = input.schedulePrecision ?? (input.startsAt ? "datetime" : "tbd");
+  let startsAtIso: string | null = null;
+  if (precision === "tbd") {
+    startsAtIso = null;
+  } else {
+    if (!input.startsAt) throw new Error(precision === "month" ? "Choose a month for this event." : "Choose a valid event date and time.");
+    const startsAt = new Date(input.startsAt);
+    if (Number.isNaN(startsAt.getTime())) throw new Error("Choose a valid event date and time.");
+    if (precision === "month") {
+      startsAtIso = new Date(Date.UTC(startsAt.getUTCFullYear(), startsAt.getUTCMonth(), 1, 12, 0, 0)).toISOString();
+    } else {
+      startsAtIso = startsAt.toISOString();
+    }
+  }
   if (!input.title.trim()) throw new Error("Event title is required.");
   if (!input.ticketTiers.length) throw new Error("Add at least one ticket type.");
 
@@ -61,7 +90,8 @@ export async function saveEvent(input: EventSaveInput, createdBy?: string | null
     summary: (input.summary || "").trim(),
     host_name: input.host.trim() || "Parle & Sip",
     category: input.category.trim(),
-    starts_at: startsAt.toISOString(),
+    starts_at: startsAtIso,
+    schedule_precision: precision,
     venue_name: input.venue.trim(),
     address: input.venue.trim(),
     area: input.area.trim(),
@@ -74,14 +104,26 @@ export async function saveEvent(input: EventSaveInput, createdBy?: string | null
 
   let eventId = input.id;
   if (eventId) {
-    const { error } = await admin.from("events").update(eventPayload).eq("id", eventId);
+    let { error } = await admin.from("events").update(eventPayload).eq("id", eventId);
+    if (isMissingSchedulePrecision(error)) {
+      const { schedule_precision: _ignored, ...legacyPayload } = eventPayload;
+      ({ error } = await admin.from("events").update(legacyPayload).eq("id", eventId));
+    }
     if (error) throw new Error(error.message);
   } else {
-    const { data, error } = await admin
+    let { data, error } = await admin
       .from("events")
       .insert({ ...eventPayload, created_by: createdBy ?? null })
       .select("id")
       .single();
+    if (isMissingSchedulePrecision(error)) {
+      const { schedule_precision: _ignored, ...legacyPayload } = eventPayload;
+      ({ data, error } = await admin
+        .from("events")
+        .insert({ ...legacyPayload, created_by: createdBy ?? null })
+        .select("id")
+        .single());
+    }
     if (error || !data) throw new Error(error?.message || "Unable to create event.");
     eventId = data.id;
   }
@@ -131,9 +173,15 @@ export async function saveEvent(input: EventSaveInput, createdBy?: string | null
     if (error) throw new Error(error.message);
   }
 
-  const { data, error } = await admin.from("events").select(eventSelect).eq("id", eventId).single();
+  let { data, error } = await admin.from("events").select(eventSelect).eq("id", eventId).single();
+  if (isMissingSchedulePrecision(error)) {
+    ({ data, error } = await admin.from("events").select(eventSelectBase).eq("id", eventId).single());
+  }
   if (error || !data) throw new Error(error?.message || "Unable to reload saved event.");
-  return mapDbEvent(data as DbEventRow);
+  return mapDbEvent({
+    ...(data as DbEventRow),
+    schedule_precision: (data as DbEventRow).schedule_precision ?? precision,
+  });
 }
 
 export async function deleteEvent(eventId: string) {

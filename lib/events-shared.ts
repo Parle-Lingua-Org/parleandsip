@@ -1,6 +1,7 @@
 import type { EventItem, TicketTier } from "@/lib/site-data";
 
 export type EventStatus = "draft" | "published" | "cancelled";
+export type SchedulePrecision = "tbd" | "month" | "datetime";
 
 export type DbEventRow = {
   id: string;
@@ -9,7 +10,8 @@ export type DbEventRow = {
   summary: string;
   host_name: string;
   category: string;
-  starts_at: string;
+  starts_at: string | null;
+  schedule_precision?: SchedulePrecision | null;
   venue_name: string;
   address: string;
   area: string;
@@ -40,9 +42,13 @@ export type DbImageRow = {
 
 export type EventRecord = EventItem & {
   slug: string;
-  startsAt: string;
+  startsAt: string | null;
   status: EventStatus;
   summary: string;
+  schedulePrecision: SchedulePrecision;
+  dayLabel: string;
+  monthLabel: string;
+  weekdayLabel: string;
 };
 
 export type EventSaveInput = {
@@ -52,7 +58,8 @@ export type EventSaveInput = {
   summary?: string;
   host: string;
   category: string;
-  startsAt: string;
+  startsAt: string | null;
+  schedulePrecision?: SchedulePrecision;
   venue: string;
   area: string;
   languages: string[];
@@ -69,30 +76,77 @@ export type EventSaveInput = {
   }>;
 };
 
-function formatParts(startsAt: string) {
+function formatParts(startsAt: string | null, precision: SchedulePrecision) {
+  if (precision === "tbd" || !startsAt) {
+    return {
+      date: "Date to be announced",
+      dateShort: "TBD",
+      time: "",
+      dayLabel: "TBD",
+      monthLabel: "TBD",
+      weekdayLabel: "",
+    };
+  }
+
   const date = new Date(startsAt);
   if (Number.isNaN(date.getTime())) {
-    return { date: startsAt, dateShort: "TBA", time: "" };
+    return {
+      date: "Date to be announced",
+      dateShort: "TBD",
+      time: "",
+      dayLabel: "TBD",
+      monthLabel: "TBD",
+      weekdayLabel: "",
+    };
   }
+
+  const monthLabel = new Intl.DateTimeFormat("en-GB", {
+    month: "short",
+    timeZone: "Africa/Lagos",
+  }).format(date).toUpperCase();
+
+  if (precision === "month") {
+    return {
+      date: new Intl.DateTimeFormat("en-GB", {
+        month: "long",
+        year: "numeric",
+        timeZone: "Africa/Lagos",
+      }).format(date),
+      dateShort: `${monthLabel} · TBD`,
+      time: "",
+      dayLabel: "TBD",
+      monthLabel,
+      weekdayLabel: "",
+    };
+  }
+
+  const dayLabel = new Intl.DateTimeFormat("en-GB", {
+    day: "2-digit",
+    timeZone: "Africa/Lagos",
+  }).format(date);
+  const weekdayLabel = new Intl.DateTimeFormat("en-GB", {
+    weekday: "short",
+    timeZone: "Africa/Lagos",
+  }).format(date).toUpperCase();
+
   return {
-    date: new Intl.DateTimeFormat("en-NG", {
+    date: new Intl.DateTimeFormat("en-GB", {
       weekday: "long",
       month: "long",
       day: "numeric",
       year: "numeric",
       timeZone: "Africa/Lagos",
     }).format(date),
-    dateShort: new Intl.DateTimeFormat("en-NG", {
-      month: "short",
-      day: "2-digit",
-      timeZone: "Africa/Lagos",
-    }).format(date).replace(" ", " ").toUpperCase(),
-    time: new Intl.DateTimeFormat("en-NG", {
+    dateShort: `${monthLabel} ${dayLabel}`,
+    time: new Intl.DateTimeFormat("en-GB", {
       hour: "numeric",
       minute: "2-digit",
       hour12: true,
       timeZone: "Africa/Lagos",
     }).format(date),
+    dayLabel,
+    monthLabel,
+    weekdayLabel,
   };
 }
 
@@ -108,7 +162,8 @@ export function slugify(value: string) {
 }
 
 export function mapDbEvent(row: DbEventRow): EventRecord {
-  const parts = formatParts(row.starts_at);
+  const schedulePrecision = row.schedule_precision ?? (row.starts_at ? "datetime" : "tbd");
+  const parts = formatParts(row.starts_at, schedulePrecision);
   const tiers = (row.ticket_tiers ?? [])
     .filter((tier) => tier.is_active !== false)
     .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
@@ -135,9 +190,13 @@ export function mapDbEvent(row: DbEventRow): EventRecord {
     startsAt: row.starts_at,
     status: row.status,
     summary: row.summary || "",
+    schedulePrecision,
     date: parts.date,
     dateShort: parts.dateShort,
     time: parts.time,
+    dayLabel: parts.dayLabel,
+    monthLabel: parts.monthLabel,
+    weekdayLabel: parts.weekdayLabel,
     venue: row.venue_name || row.address || "",
     area: row.area || "",
     languages: row.language_tags ?? [],
@@ -150,4 +209,27 @@ export function mapDbEvent(row: DbEventRow): EventRecord {
 
 export function remainingForTier(tier: TicketTier) {
   return Math.max(0, (tier.capacity || 0) - (tier.quantitySold || 0));
+}
+
+export function upcomingEvents(events: EventRecord[], limit = 3) {
+  const now = Date.now();
+  return events
+    .filter((event) => event.status === "published")
+    .slice()
+    .sort((a, b) => {
+      if (!a.startsAt && !b.startsAt) return a.title.localeCompare(b.title);
+      if (!a.startsAt) return 1;
+      if (!b.startsAt) return -1;
+      return new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime();
+    })
+    .filter((event) => {
+      if (!event.startsAt || event.schedulePrecision === "tbd") return true;
+      if (event.schedulePrecision === "month") {
+        const date = new Date(event.startsAt);
+        const endOfMonth = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 0, 23, 59, 59));
+        return endOfMonth.getTime() >= now;
+      }
+      return new Date(event.startsAt).getTime() >= now - 6 * 60 * 60 * 1000;
+    })
+    .slice(0, limit);
 }

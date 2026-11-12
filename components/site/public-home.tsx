@@ -27,7 +27,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import { usePublishedEventsQuery, useSiteSettingsQuery } from "@/hooks/use-site-data";
-import { remainingForTier, type EventRecord } from "@/lib/events-shared";
+import { remainingForTier, upcomingEvents, type EventRecord } from "@/lib/events-shared";
 import { formatNaira, initialSiteData, parseEventAreas } from "@/lib/site-data";
 import Image from "next/image";
 import LogoUse from "@/app/logo.webp";
@@ -66,7 +66,8 @@ export function PublicHome() {
   const [checkoutUrl, setCheckoutUrl] = useState("");
   const [checkoutBusy, setCheckoutBusy] = useState(false);
 
-  const featuredEvent = events.find((event) => event.slug === content.featuredEventId || event.id === content.featuredEventId) ?? events[0];
+  const featuredEvent = events.find((event) => event.slug === content.featuredEventId || event.id === content.featuredEventId) ?? upcomingEvents(events, 1)[0] ?? events[0];
+  const nextEditions = upcomingEvents(events, 3);
   const visibleEvents = events.filter((event) => {
     const categoryMatch = category === "All experiences" || event.category === category;
     const areaMatch = area === areaFilterAll || event.area === area;
@@ -195,7 +196,7 @@ export function PublicHome() {
               <p className="font-mono text-[9px] uppercase tracking-wide text-dap-feature-copy">{featuredEvent?.category ?? "Community meetup"} <span className="px-1 text-primary">·</span> {featuredEvent?.area ?? content.cityName}</p>
               <h2 className="mt-2 text-3xl font-bold leading-tight">{featuredEvent?.title ?? "Your next conversation starts here"}</h2>
               <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-                <span className="flex items-center gap-1.5 font-mono text-[9px]"><CalendarDays size={14} /> {featuredEvent?.dateShort ?? "LAGOS"} · {featuredEvent?.time ?? "SOON"}</span>
+                <span className="flex items-center gap-1.5 font-mono text-[9px]"><CalendarDays size={14} /> {featuredEvent ? (featuredEvent.time ? `${featuredEvent.dateShort} · ${featuredEvent.time}` : featuredEvent.dateShort) : "TBD"}</span>
                 {featuredEvent && <Button size="sm" onClick={() => openTickets(featuredEvent)}>Get tickets <ArrowRight size={14} /></Button>}
               </div>
             </div>
@@ -210,9 +211,11 @@ export function PublicHome() {
           <Card className="min-h-[190px] bg-card p-4 shadow-[4px_4px_0_var(--foreground)] xl:col-span-3">
             <span className="font-mono text-[8px] tracking-wide text-muted-foreground">{content.calendarTitle}</span>
             <div className="mt-3 grid gap-2">
-              {loadingHome ? Array.from({ length: 3 }).map((_, index) => <div key={index} className="grid grid-cols-[36px_35px_1fr] items-center gap-2 border-t border-dap-border-soft pt-2 first:border-0 first:pt-0"><Skeleton className="h-8 w-9" /><Skeleton className="h-4 w-8" /><Skeleton className="h-4 w-full" /></div>) : events.slice(0, 3).map((event) => <a key={event.id} className="grid grid-cols-[36px_35px_1fr] items-center gap-2 border-t border-dap-border-soft pt-2 first:border-0 first:pt-0" href="#events">
-                <strong className="text-xl leading-none">{event.dateShort.slice(-2)}</strong><span className="font-mono text-[7px] leading-tight text-muted-foreground">{event.dateShort.slice(0, 3)}<br />{event.date.slice(0, 3).toUpperCase()}</span><small className="truncate text-[9px]">{event.title}</small>
-              </a>)}
+              {loadingHome ? Array.from({ length: 3 }).map((_, index) => <div key={index} className="grid grid-cols-[36px_35px_1fr] items-center gap-2 border-t border-dap-border-soft pt-2 first:border-0 first:pt-0"><Skeleton className="h-8 w-9" /><Skeleton className="h-4 w-8" /><Skeleton className="h-4 w-full" /></div>) : nextEditions.length ? nextEditions.map((event) => <a key={event.id} className="grid grid-cols-[40px_42px_1fr] items-center gap-2 border-t border-dap-border-soft pt-2 first:border-0 first:pt-0" href="#events">
+                <strong className="text-xl leading-none tracking-tight">{event.dayLabel}</strong>
+                <span className="font-mono text-[7px] leading-tight text-muted-foreground">{event.monthLabel}{event.weekdayLabel ? <><br />{event.weekdayLabel}</> : null}</span>
+                <small className="truncate text-[9px]">{event.title}</small>
+              </a>) : <p className="border-t border-dap-border-soft pt-2 text-[9px] text-muted-foreground">No upcoming editions yet.</p>}
             </div>
             <a className="mt-3 inline-flex items-center gap-1.5 text-[9px] font-semibold" href="#events">See all meetups <ArrowRight size={13} /></a>
           </Card>

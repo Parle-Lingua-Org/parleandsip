@@ -23,8 +23,9 @@ create table if not exists public.events (
   summary text not null default '',
   host_name text not null default '',
   category text not null,
-  starts_at timestamptz not null,
+  starts_at timestamptz,
   ends_at timestamptz,
+  schedule_precision text not null default 'datetime' check (schedule_precision in ('tbd', 'month', 'datetime')),
   venue_name text not null default '',
   address text not null default '',
   area text not null default '',
@@ -36,6 +37,12 @@ create table if not exists public.events (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+alter table public.events add column if not exists schedule_precision text not null default 'datetime';
+alter table public.events drop constraint if exists events_schedule_precision_check;
+alter table public.events add constraint events_schedule_precision_check
+  check (schedule_precision in ('tbd', 'month', 'datetime'));
+alter table public.events alter column starts_at drop not null;
 
 create table if not exists public.event_images (
   id uuid primary key default gen_random_uuid(),
