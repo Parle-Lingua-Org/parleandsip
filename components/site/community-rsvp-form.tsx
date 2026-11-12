@@ -18,6 +18,27 @@ function toggleValue(list: string[], value: string) {
   return list.includes(value) ? list.filter((item) => item !== value) : [...list, value];
 }
 
+function ChoiceButton({
+  selected,
+  onSelect,
+  children,
+}: {
+  selected: boolean;
+  onSelect: () => void;
+  children: string;
+}) {
+  return (
+    <button
+      type="button"
+      aria-pressed={selected}
+      onClick={onSelect}
+      className={`flex min-h-10 items-center border-2 px-3 text-left text-[11px] transition-colors ${selected ? "border-foreground bg-secondary" : "border-input bg-card hover:border-foreground"}`}
+    >
+      {children}
+    </button>
+  );
+}
+
 export function CommunityRsvpForm({ onDone }: { onDone?: () => void }) {
   const [email, setEmail] = useState("");
   const [fullName, setFullName] = useState("");
@@ -40,6 +61,10 @@ export function CommunityRsvpForm({ onDone }: { onDone?: () => void }) {
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (!learningFrench || !frenchLevel || !heardFrom || !followingSocial) {
+      setError("Please answer all required choice questions.");
+      return;
+    }
     setBusy(true);
     setError("");
     try {
@@ -101,7 +126,7 @@ export function CommunityRsvpForm({ onDone }: { onDone?: () => void }) {
       <section className="grid gap-3 sm:grid-cols-2">
         <label className="grid gap-1 text-[10px] font-semibold sm:col-span-2">1. Email *<Input type="email" required value={email} onChange={(event) => setEmail(event.target.value)} /></label>
         <label className="grid gap-1 text-[10px] font-semibold">2. Full name *<Input required value={fullName} onChange={(event) => setFullName(event.target.value)} /></label>
-        <label className="grid gap-1 text-[10px] font-semibold">3. Name on ticket *<Input required value={ticketName} onChange={(event) => setTicketName(event.target.value)} placeholder="First name for the ticket" /></label>
+        <label className="grid gap-1 text-[10px] font-semibold">3. Prefered name on ticket *<Input required value={ticketName} onChange={(event) => setTicketName(event.target.value)} placeholder="First name for the ticket" /></label>
         <label className="grid gap-1 text-[10px] font-semibold sm:col-span-2">4. WhatsApp number *<Input required value={whatsapp} onChange={(event) => setWhatsapp(event.target.value)} placeholder="+234..." /></label>
       </section>
 
@@ -111,10 +136,9 @@ export function CommunityRsvpForm({ onDone }: { onDone?: () => void }) {
           <legend className="text-[10px] font-semibold">5. Are you currently learning / studying French? *</legend>
           <div className="grid gap-2 sm:grid-cols-3">
             {LEARNING_FRENCH_OPTIONS.map((option) => (
-              <label key={option} className={`flex min-h-10 cursor-pointer items-center border-2 px-3 text-[11px] ${learningFrench === option ? "border-foreground bg-secondary" : "border-input bg-card"}`}>
-                <input className="sr-only" type="radio" name="learningFrench" value={option} checked={learningFrench === option} onChange={() => setLearningFrench(option)} required />
+              <ChoiceButton key={option} selected={learningFrench === option} onSelect={() => setLearningFrench(option)}>
                 {option}
-              </label>
+              </ChoiceButton>
             ))}
           </div>
         </fieldset>
@@ -122,10 +146,9 @@ export function CommunityRsvpForm({ onDone }: { onDone?: () => void }) {
           <legend className="text-[10px] font-semibold">6. How would you describe your current level of French? *</legend>
           <div className="grid gap-2 sm:grid-cols-2">
             {FRENCH_LEVEL_OPTIONS.map((option) => (
-              <label key={option} className={`flex min-h-10 cursor-pointer items-center border-2 px-3 text-[11px] ${frenchLevel === option ? "border-foreground bg-secondary" : "border-input bg-card"}`}>
-                <input className="sr-only" type="radio" name="frenchLevel" value={option} checked={frenchLevel === option} onChange={() => setFrenchLevel(option)} required />
+              <ChoiceButton key={option} selected={frenchLevel === option} onSelect={() => setFrenchLevel(option)}>
                 {option}
-              </label>
+              </ChoiceButton>
             ))}
           </div>
         </fieldset>
@@ -167,10 +190,9 @@ export function CommunityRsvpForm({ onDone }: { onDone?: () => void }) {
           <legend className="text-[10px] font-semibold">11. How did you hear about Parle & Sip? *</legend>
           <div className="grid gap-2 sm:grid-cols-2">
             {HEARD_FROM_OPTIONS.map((option) => (
-              <label key={option} className={`flex min-h-10 cursor-pointer items-center border-2 px-3 text-[11px] ${heardFrom === option ? "border-foreground bg-secondary" : "border-input bg-card"}`}>
-                <input className="sr-only" type="radio" name="heardFrom" value={option} checked={heardFrom === option} onChange={() => setHeardFrom(option)} required />
+              <ChoiceButton key={option} selected={heardFrom === option} onSelect={() => setHeardFrom(option)}>
                 {option}
-              </label>
+              </ChoiceButton>
             ))}
           </div>
           {heardFrom === "Other" ? <Input required value={heardFromOther} onChange={(event) => setHeardFromOther(event.target.value)} placeholder="Where did you hear about us?" /> : null}
@@ -180,16 +202,15 @@ export function CommunityRsvpForm({ onDone }: { onDone?: () => void }) {
           <p className="text-[10px] text-muted-foreground">TikTok @parle.sip · Instagram @parlesip</p>
           <div className="grid gap-2 sm:grid-cols-2">
             {FOLLOWING_SOCIAL_OPTIONS.map((option) => (
-              <label key={option} className={`flex min-h-10 cursor-pointer items-center border-2 px-3 text-[11px] ${followingSocial === option ? "border-foreground bg-secondary" : "border-input bg-card"}`}>
-                <input className="sr-only" type="radio" name="followingSocial" value={option} checked={followingSocial === option} onChange={() => setFollowingSocial(option)} required />
+              <ChoiceButton key={option} selected={followingSocial === option} onSelect={() => setFollowingSocial(option)}>
                 {option}
-              </label>
+              </ChoiceButton>
             ))}
           </div>
         </fieldset>
       </section>
 
-      <Button type="submit" className="w-full" disabled={busy}>{busy ? "Submitting…" : "Submit RSVP"}</Button>
+      <Button type="submit" className="w-full" disabled={busy}>{busy ? "Submitting…" : "Join Community"}</Button>
     </form>
   );
 }
