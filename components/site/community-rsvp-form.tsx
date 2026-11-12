@@ -115,12 +115,12 @@ export function CommunityRsvpForm({ onDone }: { onDone?: () => void }) {
 
   return (
     <form className="max-h-[min(70dvh,720px)] space-y-5 overflow-y-auto p-4 sm:p-5" onSubmit={(event) => void submit(event)}>
-      <div>
+      {/* <div>
         <p className="font-mono text-[9px] tracking-wide text-muted-foreground">RSVP · ABUJA PARLE FRANÇAIS</p>
         <p className="mt-1 text-[10px] leading-5 text-muted-foreground">
           Event: 1st Floor, Tropic Gallery Mall, beside Grand Square, CBD, Abuja. Required fields are marked *.
         </p>
-      </div>
+      </div> */}
       {error ? <p role="alert" className="border-2 border-primary bg-card px-3 py-2 text-xs text-primary">{error}</p> : null}
 
       <section className="grid gap-3 sm:grid-cols-2">
