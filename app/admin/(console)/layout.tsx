@@ -3,9 +3,9 @@
 import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { CalendarDays, Eye, KeyRound, LayoutDashboard, LogOut, Palette, ScanLine, Stamp, Ticket, UsersRound } from "lucide-react";
+import { CalendarDays, Eye, KeyRound, LayoutDashboard, LogOut, Palette, ScanLine, Stamp, Ticket } from "lucide-react";
+import { BrandLogo } from "@/components/site/brand-logo";
 import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
 import { useSiteSettingsQuery } from "@/hooks/use-site-data";
 import { initialSiteData } from "@/lib/site-data";
 
@@ -59,7 +59,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
     <div className="min-h-screen bg-background text-foreground lg:grid lg:grid-cols-[240px_1fr]">
       <aside className="hidden min-h-screen flex-col border-r-2 border-foreground bg-card lg:flex">
         <Link href="/" className="flex min-h-[76px] items-center gap-2 border-b-2 border-foreground px-6 text-lg font-bold">
-          {settingsQuery.isLoading ? <Skeleton className="size-9" /> : content.logoImage ? <img src={content.logoImage} alt="" className="size-9 border-2 border-foreground object-cover" /> : <span className="grid size-9 place-items-center border-2 border-foreground bg-primary"><UsersRound size={18} /></span>}
+          <BrandLogo size={36} />
           {content.brandName}<span className="-ml-2 text-accent">.</span><span className="ml-auto font-mono text-[8px] font-normal text-muted-foreground">ADMIN</span>
         </Link>
         <p className="px-6 pb-2 pt-6 font-mono text-[8px] tracking-wider text-muted-foreground">WORKSPACE</p>
@@ -78,7 +78,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
 
       <div className="min-w-0">
         <header className="flex min-h-[68px] items-center justify-between gap-3 border-b-2 border-foreground px-4 sm:px-7">
-          <div className="flex items-center gap-2 lg:hidden"><span className="grid size-8 place-items-center border-2 border-foreground bg-primary"><UsersRound size={16} /></span><span className="font-bold">{content.brandName}<span className="text-accent">.</span></span></div>
+          <div className="flex items-center gap-2 lg:hidden"><BrandLogo size={32} /><span className="font-bold">{content.brandName}<span className="text-accent">.</span></span></div>
           <p className="hidden font-mono text-[9px] tracking-wide text-muted-foreground lg:block">PARLE & SIP / ADMIN / {navigation.find((item) => item.href === pathname)?.label.toUpperCase() ?? "WORKSPACE"}</p>
           <div className="ml-auto flex items-center gap-2"><Button asChild size="sm" variant="outline"><Link href="/"><Eye size={14} /><span className="hidden sm:inline">Preview site</span></Link></Button><Button variant="ghost" size="icon" className="lg:hidden" aria-label="Sign out" onClick={signOut}><LogOut size={15} /></Button></div>
         </header>

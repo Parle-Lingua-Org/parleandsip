@@ -29,8 +29,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { usePublishedEventsQuery, useSiteSettingsQuery } from "@/hooks/use-site-data";
 import { remainingForTier, upcomingEvents, type EventRecord } from "@/lib/events-shared";
 import { formatNaira, initialSiteData } from "@/lib/site-data";
-import Image from "next/image";
-import LogoUse from "@/app/logo.webp";
+import { BrandLogo } from "@/components/site/brand-logo";
 
 const createWithFormUrl = "https://docs.google.com/forms/d/1LhlPUi_uVlC41u3JguE9TOTjKlaISiVqs1AbKIi3Q9k/viewform?embedded=true";
 
@@ -129,33 +128,12 @@ export function PublicHome() {
       </div>
 
       <header className="relative z-20 flex h-[68px] items-center gap-8 border-b-2 border-foreground px-4 sm:px-8 lg:px-[max(2rem,calc((100vw-1200px)/2))]">
-        {/* <a className="flex shrink-0 items-center gap-2 text-xl font-bold tracking-tight" href="#top" aria-label={`${content.brandName} home`}>
-          {content.logoImage ? <img src={content.logoImage} alt="" className="size-8 border-2 border-foreground object-cover" /> : <span className="grid size-8 place-items-center border-2 border-foreground bg-primary"><img src={LogoUse} alt="" /></span>}{content.brandName}<span className="text-accent">.</span>
-        </a> */}
         <a
           className="flex shrink-0 items-center gap-2 text-xl font-bold tracking-tight"
           href="#top"
           aria-label={`${content.brandName} home`}
         >
-          {content.logoImage ? (
-            <img
-              src={content.logoImage}
-              alt=""
-              className="size-8 border-2 border-foreground object-cover"
-            />
-          ) : (
-            <span className="grid size-8 place-items-center">
-              <Image
-                src={LogoUse}
-                alt=""
-                width={32}
-                height={32}
-                className="object-contain"
-                priority
-              />
-            </span>
-          )}
-
+          <BrandLogo size={32} priority />
           {content.brandName}
           <span className="text-accent">.</span>
         </a>
@@ -164,9 +142,8 @@ export function PublicHome() {
         </button>
         <nav className={`${menuOpen ? "absolute left-0 right-0 top-[66px] flex border-b-2 border-foreground bg-background px-4 shadow-[0_5px_0_var(--foreground)] md:static md:h-full md:border-0 md:bg-transparent md:p-0 md:shadow-none" : "hidden md:flex"} flex-col items-stretch gap-0 md:ml-4 md:flex-row md:items-center md:gap-7`} aria-label="Main navigation">
           <a className="border-b border-dap-border-soft py-3 text-xs font-semibold md:border-0 md:py-0" href="#events" onClick={() => setMenuOpen(false)}>{content.navExplore}</a>
-          <a className="border-b border-dap-border-soft py-3 text-xs text-muted-foreground md:border-0 md:py-0" href="#community" onClick={() => setMenuOpen(false)}>{content.navCommunity}</a>
-          <a className="border-b border-dap-border-soft py-3 text-xs text-muted-foreground md:border-0 md:py-0" href="#for-pros" onClick={() => setMenuOpen(false)}>{content.navPros}</a>
-          <a className="py-3 text-xs text-muted-foreground md:py-0" href="#contact" onClick={() => setMenuOpen(false)}>{content.navContact}</a>
+          <a className="border-b border-dap-border-soft py-3 text-xs text-muted-foreground md:border-0 md:py-0" href="/about" onClick={() => setMenuOpen(false)}>{content.navAbout || "About us"}</a>
+          <a className="py-3 text-xs text-muted-foreground md:py-0" href="/contact" onClick={() => setMenuOpen(false)}>{content.navContact}</a>
         </nav>
         <Button type="button" size="sm" variant="outline" className="ml-auto hidden md:inline-flex" onClick={() => setCreateFormOpen(true)}>{content.proCta} <ArrowRight size={14} /></Button>
       </header>
@@ -304,7 +281,7 @@ export function PublicHome() {
         </section>
 
         <footer className="mt-10 flex min-h-20 flex-wrap items-center gap-3 border-t-2 border-foreground py-4">
-          <a className="flex items-center gap-2 text-lg font-bold" href="#top">{content.logoImage ? <img src={content.logoImage} alt="" className="size-7 border-2 border-foreground object-cover" /> : <span className="grid size-7 place-items-center border-2 border-foreground bg-primary"><Languages size={16} /></span>}{content.brandName}<span className="text-accent">.</span></a>
+          <a className="flex items-center gap-2 text-lg font-bold" href="#top"><BrandLogo size={28} />{content.brandName}<span className="text-accent">.</span></a>
           <p className="font-serif text-xs italic text-muted-foreground">{content.footerText}</p>
           <span className="ml-auto text-right font-mono text-[8px] tracking-wide text-muted-foreground">{content.footerLocation} <span className="px-1 text-accent">●</span> {content.footerCurrency}</span>
         </footer>

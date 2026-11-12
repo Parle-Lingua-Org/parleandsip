@@ -30,9 +30,17 @@ export type SiteContent = {
   faviconImage: string;
   announcement: string;
   navExplore: string;
+  navAbout: string;
   navCommunity: string;
   navPros: string;
   navContact: string;
+  aboutEyebrow: string;
+  aboutTitle: string;
+  aboutBody: string;
+  aboutImage: string;
+  contactPageEyebrow: string;
+  contactPageTitle: string;
+  contactPageDescription: string;
   heroEyebrow: string;
   heroTitle: string;
   heroSecondLine: string;
@@ -114,9 +122,17 @@ export const initialSiteData: SiteData = {
     faviconImage: "",
     announcement: "FRENCH, CULTURE, CREATIVITY & CONNECTION.",
     navExplore: "Explore experiences",
+    navAbout: "About us",
     navCommunity: "Our community",
     navPros: "Host with us",
-    navContact: "Contact",
+    navContact: "Contact us",
+    aboutEyebrow: "OUR STORY",
+    aboutTitle: "French, culture & connection.",
+    aboutBody: "Parle & Sip brings French learners, Francophones, Francophiles and culture enthusiasts together in Abuja to practice French, explore Francophone culture and make meaningful connections.\n\nWe gather around conversation, food, art, games and shared curiosity — so learning French feels like living it.",
+    aboutImage: "",
+    contactPageEyebrow: "GET IN TOUCH",
+    contactPageTitle: "Say hello.",
+    contactPageDescription: "Questions about a seat, a collaboration, or the next gathering. Write, message, or find us on social.",
     heroEyebrow: "LEARN. CONNECT. EXPERIENCE.",
     heroTitle: "A little French.",
     heroSecondLine: "A lot to share.",

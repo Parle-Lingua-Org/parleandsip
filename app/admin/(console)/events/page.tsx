@@ -1,7 +1,7 @@
 "use client";
 
-import { useMemo, useState, type FormEvent } from "react";
-import { CalendarDays, Check, ImagePlus, Plus, Save, Trash2 } from "lucide-react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { CalendarDays, Check, ChevronLeft, ChevronRight, ImagePlus, Plus, Save, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -18,6 +18,8 @@ import {
 import type { EventRecord, SchedulePrecision } from "@/lib/events-shared";
 import { createTicketTiers, formatNaira, parseEventAreas, type TicketTier } from "@/lib/site-data";
 import { imageFileToDataUrl } from "@/lib/image-upload";
+
+const EVENTS_PAGE_SIZE = 8;
 
 type EventDraft = {
   id?: string;
@@ -115,6 +117,17 @@ export default function AdminEventsPage() {
   const [uploadError, setUploadError] = useState("");
   const [formError, setFormError] = useState("");
   const [pickBusy, setPickBusy] = useState(false);
+  const [listPage, setListPage] = useState(1);
+
+  const totalPages = Math.max(1, Math.ceil(events.length / EVENTS_PAGE_SIZE));
+  const pageEvents = useMemo(
+    () => events.slice((listPage - 1) * EVENTS_PAGE_SIZE, listPage * EVENTS_PAGE_SIZE),
+    [events, listPage],
+  );
+
+  useEffect(() => {
+    if (listPage > totalPages) setListPage(totalPages);
+  }, [listPage, totalPages]);
 
   const saved = useMemo(() => saveMutation.isSuccess && !saveMutation.isPending, [saveMutation.isPending, saveMutation.isSuccess]);
 
@@ -237,10 +250,12 @@ export default function AdminEventsPage() {
         <Card className="overflow-hidden shadow-[4px_4px_0_var(--foreground)]">
           <div className="border-b-2 border-foreground p-4">
             <h2 className="font-bold">Event list</h2>
-            <p className="mt-1 text-[10px] text-muted-foreground">{events.length} experiences in the database</p>
+            <p className="mt-1 text-[10px] text-muted-foreground">
+              {events.length} experiences · page {listPage} of {totalPages}
+            </p>
           </div>
           <div className="divide-y divide-dap-border-muted">
-            {events.map((event) => (
+            {pageEvents.map((event) => (
               <button key={event.id} type="button" onClick={() => { setDraft(fromRecord(event)); saveMutation.reset(); setFormError(""); }} className={`flex w-full items-center gap-3 p-3 text-left hover:bg-muted ${draft?.id === event.id ? "bg-secondary" : ""}`}>
                 <span className="size-12 shrink-0 border border-foreground bg-cover bg-center" style={{ backgroundImage: event.image ? `url("${event.image}")` : undefined }} />
                 <span className="min-w-0 flex-1">
@@ -252,6 +267,17 @@ export default function AdminEventsPage() {
             ))}
           </div>
           {!events.length && <p className="p-5 text-xs text-muted-foreground">No events yet. Create your first meetup.</p>}
+          {events.length > EVENTS_PAGE_SIZE && (
+            <div className="flex items-center justify-between gap-2 border-t-2 border-foreground p-3">
+              <Button type="button" variant="outline" size="sm" disabled={listPage <= 1} onClick={() => setListPage((page) => Math.max(1, page - 1))}>
+                <ChevronLeft size={14} /> Prev
+              </Button>
+              <span className="font-mono text-[9px] text-muted-foreground">{listPage} / {totalPages}</span>
+              <Button type="button" variant="outline" size="sm" disabled={listPage >= totalPages} onClick={() => setListPage((page) => Math.min(totalPages, page + 1))}>
+                Next <ChevronRight size={14} />
+              </Button>
+            </div>
+          )}
         </Card>
 
         <Card className="min-w-0 p-4 shadow-[4px_4px_0_var(--foreground)] sm:p-6">
