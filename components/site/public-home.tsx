@@ -190,7 +190,7 @@ export function PublicHome() {
 
         <section className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-12" aria-label="Featured Parle & Sip experiences">
           <Card className="relative min-h-[390px] overflow-hidden bg-dap-hero text-card shadow-[4px_4px_0_var(--foreground)] md:row-span-2 xl:col-span-6">
-            {featuredEvent && <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `linear-gradient(180deg,rgb(var(--dap-overlay-rgb)/.04) 18%,rgb(var(--dap-overlay-rgb)/.78) 100%),url("${content.heroImage || featuredEvent.image}")` }} />}
+            {featuredEvent && (featuredEvent.image || content.heroImage) && <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `linear-gradient(180deg,rgb(var(--dap-overlay-rgb)/.04) 18%,rgb(var(--dap-overlay-rgb)/.78) 100%),url("${featuredEvent.image || content.heroImage}")` }} />}
             <Badge className="absolute left-4 top-4 gap-1.5"><Sparkles size={12} /> THIS WEEK&apos;S PICK</Badge>
             <div className="absolute inset-x-4 bottom-4 sm:inset-x-5 sm:bottom-5">
               <p className="font-mono text-[9px] uppercase tracking-wide text-dap-feature-copy">{featuredEvent?.category ?? "Community meetup"} <span className="px-1 text-primary">·</span> {featuredEvent?.area ?? content.cityName}</p>
