@@ -292,9 +292,8 @@ export function PublicHome() {
       <Dialog open={createFormOpen} onOpenChange={setCreateFormOpen}>
         <DialogContent className="max-w-3xl overflow-hidden p-0">
           <div className="border-b-2 border-foreground px-5 py-4 pr-14">
-            <p className="font-mono text-[9px] tracking-wide text-muted-foreground">RSVP · ABUJA PARLE FRANÇAIS</p>
             <DialogTitle className="mt-1 text-xl font-bold">{content.proCta}</DialogTitle>
-            <DialogDescription className="mt-1 text-xs text-muted-foreground">Fill the form below. We&apos;ll use your answers for your place and ticket name.</DialogDescription>
+            <DialogDescription className="mt-1 text-xs text-muted-foreground">Fill the form below. We&apos;ll use your answers to know you better.</DialogDescription>
           </div>
           <CommunityRsvpForm onDone={() => setCreateFormOpen(false)} />
         </DialogContent>
