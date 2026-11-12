@@ -53,9 +53,9 @@ export default function AdminOverviewPage() {
   const totalRevenue = paidOrders.reduce((sum, order) => sum + order.total, 0);
   const ticketCount = paidOrders.reduce((sum, order) => sum + order.quantity, 0);
   const metrics = [
-    { label: "Listed events", value: events.length, icon: CalendarDays, note: "From Supabase" },
-    { label: "Paid orders", value: paidOrders.length, icon: ClipboardList, note: "From Supabase" },
-    { label: "Tickets sold", value: ticketCount, icon: Ticket, note: "From Supabase" },
+    { label: "Listed events", value: events.length, icon: CalendarDays, note: "Live" },
+    { label: "Paid orders", value: paidOrders.length, icon: ClipboardList, note: "Live" },
+    { label: "Tickets sold", value: ticketCount, icon: Ticket, note: "Live" },
     { label: "Ticket value", value: formatNaira(totalRevenue), icon: CircleDollarSign, note: "Paid only" },
   ];
 
@@ -87,7 +87,7 @@ export default function AdminOverviewPage() {
           <div className="flex items-center justify-between gap-3 border-b-2 border-foreground p-4">
             <div>
               <h2 className="font-bold">Recent ticket buyers</h2>
-              <p className="mt-1 text-[10px] text-muted-foreground">Paid bookings from Supabase ticket orders.</p>
+              <p className="mt-1 text-[10px] text-muted-foreground">Paid bookings Live ticket orders.</p>
             </div>
             <Button asChild size="sm" variant="outline"><Link href="/admin/orders">View all <ArrowRight size={13} /></Link></Button>
           </div>
@@ -122,7 +122,7 @@ export default function AdminOverviewPage() {
           <div className="flex items-center justify-between gap-3 border-b-2 border-foreground p-4">
             <div>
               <h2 className="font-bold">Upcoming meetups</h2>
-              <p className="mt-1 text-[10px] text-muted-foreground">Events loaded from Supabase.</p>
+              <p className="mt-1 text-[10px] text-muted-foreground">Events loaded Live.</p>
             </div>
             <Button asChild size="sm"><Link href="/admin/events">Manage <ArrowRight size={13} /></Link></Button>
           </div>

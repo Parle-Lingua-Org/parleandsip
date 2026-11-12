@@ -28,11 +28,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import { usePublishedEventsQuery, useSiteSettingsQuery } from "@/hooks/use-site-data";
 import { remainingForTier, upcomingEvents, type EventRecord } from "@/lib/events-shared";
-import { formatNaira, initialSiteData, parseEventAreas } from "@/lib/site-data";
+import { formatNaira, initialSiteData } from "@/lib/site-data";
 import Image from "next/image";
 import LogoUse from "@/app/logo.webp";
 
-const categoryOptions = ["All experiences", "French conversation", "Francophone culture", "Art & creativity", "Food & gastronomy", "Games & conversation"];
 const createWithFormUrl = "https://docs.google.com/forms/d/1LhlPUi_uVlC41u3JguE9TOTjKlaISiVqs1AbKIi3Q9k/viewform?embedded=true";
 
 export function PublicHome() {
@@ -40,10 +39,6 @@ export function PublicHome() {
   const eventsQuery = usePublishedEventsQuery();
   const content = settingsQuery.data?.content ?? initialSiteData.content;
   const events = eventsQuery.data ?? [];
-  const areaFilterAll = content.areaFilterAll || `All ${content.cityName || "Abuja"}`;
-  const areaOptions = [areaFilterAll, ...parseEventAreas(content.eventAreas)];
-  const [category, setCategory] = useState("All experiences");
-  const [area, setArea] = useState(areaFilterAll);
   const [query, setQuery] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
   const [createFormOpen, setCreateFormOpen] = useState(false);
@@ -69,10 +64,8 @@ export function PublicHome() {
   const featuredEvent = events.find((event) => event.slug === content.featuredEventId || event.id === content.featuredEventId) ?? upcomingEvents(events, 1)[0] ?? events[0];
   const nextEditions = upcomingEvents(events, 3);
   const visibleEvents = events.filter((event) => {
-    const categoryMatch = category === "All experiences" || event.category === category;
-    const areaMatch = area === areaFilterAll || event.area === area;
-    const searchMatch = !query.trim() || `${event.title} ${event.host} ${event.category} ${event.venue} ${event.area} ${event.languages.join(" ")}`.toLowerCase().includes(query.trim().toLowerCase());
-    return categoryMatch && areaMatch && searchMatch;
+    if (!query.trim()) return true;
+    return `${event.title} ${event.host} ${event.category} ${event.venue} ${event.area} ${event.languages.join(" ")}`.toLowerCase().includes(query.trim().toLowerCase());
   });
   const selectedTier = selectedEvent?.ticketTiers.find((tier) => tier.id === selectedTierId) ?? selectedEvent?.ticketTiers[0];
   const eventImages = selectedEvent ? [selectedEvent.image, ...selectedEvent.gallery].filter((image, index, list) => Boolean(image) && list.indexOf(image) === index) : [];
@@ -232,10 +225,6 @@ export function PublicHome() {
           <div className="flex flex-col justify-between gap-4 md:flex-row md:items-end">
             <div><p className="flex items-center gap-2 font-mono text-[9px] tracking-wider text-muted-foreground"><span className="size-2 border border-foreground bg-accent" />{content.eventsEyebrow}</p><h2 id="events-title" className="mt-2 text-[28px] font-bold leading-tight tracking-tight sm:text-3xl">{content.eventsTitle} <span className="text-dap-green">{content.eventsEmphasis}</span></h2></div>
             <label className="flex min-h-10 w-full items-center gap-2 border-2 border-foreground bg-card px-2.5 shadow-[3px_3px_0_var(--foreground)] md:max-w-[300px]" htmlFor="event-search"><Search size={16} /><Input id="event-search" className="h-9 border-0 px-0 shadow-none focus-visible:ring-0" placeholder="Try French, art, food, games..." value={query} onChange={(event) => setQuery(event.target.value)} /><kbd className="border border-dap-border-soft px-1 text-[9px] text-muted-foreground">/</kbd></label>
-          </div>
-          <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex gap-2 overflow-x-auto pb-1" aria-label="Filter by meetup type">{categoryOptions.map((option) => <Button key={option} variant={category === option ? "secondary" : "outline"} size="sm" className="shrink-0" aria-pressed={category === option} onClick={() => setCategory(option)}>{option}</Button>)}</div>
-            <label className="flex min-h-9 shrink-0 items-center gap-2 border-2 border-foreground bg-card px-2 text-xs"><MapPin size={14} /><select className="max-w-36 bg-transparent outline-none" value={areaOptions.includes(area) ? area : areaFilterAll} onChange={(event) => setArea(event.target.value)}>{areaOptions.map((option) => <option key={option}>{option}</option>)}</select></label>
           </div>
           {loadingHome ? (
             <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">

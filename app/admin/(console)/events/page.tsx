@@ -61,7 +61,7 @@ function newEvent(cityName: string, defaultArea: string): EventDraft {
   return {
     title: "New Parle & Sip experience",
     host: "Parle & Sip",
-    category: "French conversation",
+    category: "",
     startsAt: starts.toISOString(),
     schedulePrecision: "datetime",
     venue: `Venue name, ${cityName}`,
@@ -103,10 +103,13 @@ export default function AdminEventsPage() {
   const saveSettingsMutation = useSaveSiteSettingsMutation();
   const content = settingsQuery.data?.content;
   const featuredSlug = content?.featuredEventId || "";
-  const areaOptions = parseEventAreas(content?.eventAreas || "");
+  const configuredAreas = parseEventAreas(content?.eventAreas || "");
   const cityName = content?.cityName || "Abuja";
-  const defaultArea = areaOptions[0] || cityName;
   const events = eventsQuery.data ?? [];
+  const areaOptions = [...configuredAreas, ...events.map((event) => event.area)]
+    .map((area) => area.trim())
+    .filter((area, index, list) => Boolean(area) && list.findIndex((item) => item.toLowerCase() === area.toLowerCase()) === index);
+  const defaultArea = areaOptions[0] || cityName;
   const [draft, setDraft] = useState<EventDraft | null>(null);
   const [galleryUrl, setGalleryUrl] = useState("");
   const [uploadError, setUploadError] = useState("");
@@ -272,7 +275,7 @@ export default function AdminEventsPage() {
                 <div className="grid gap-3 sm:grid-cols-2">
                   <label className="grid gap-1 text-[10px] font-semibold sm:col-span-2">Experience title<Input required value={draft.title} onChange={(event) => updateDraft("title", event.target.value)} /></label>
                   <label className="grid gap-1 text-[10px] font-semibold">Host<Input value={draft.host} onChange={(event) => updateDraft("host", event.target.value)} /></label>
-                  <label className="grid gap-1 text-[10px] font-semibold">Experience type<select className="h-10 border-2 border-input bg-card px-2 text-xs" value={draft.category} onChange={(event) => updateDraft("category", event.target.value)}><option>French conversation</option><option>Francophone culture</option><option>Art & creativity</option><option>Food & gastronomy</option><option>Games & conversation</option></select></label>
+                  <label className="grid gap-1 text-[10px] font-semibold">Category<Input required value={draft.category} onChange={(event) => updateDraft("category", event.target.value)} placeholder="e.g. French conversation" /></label>
                   <label className="grid gap-1 text-[10px] font-semibold">Schedule<select className="h-10 border-2 border-input bg-card px-2 text-xs" value={draft.schedulePrecision} onChange={(event) => {
                     const next = event.target.value as SchedulePrecision;
                     setDraft((current) => current ? { ...current, schedulePrecision: next, startsAt: next === "tbd" ? null : current.startsAt } : current);
@@ -305,7 +308,7 @@ export default function AdminEventsPage() {
                     </Button>
                     <p className="mt-1 text-[9px] text-muted-foreground">Controls the large “THIS WEEK'S PICK” card on the homepage.</p>
                   </div>
-                  <label className="grid gap-1 text-[10px] font-semibold">Area<select className="h-10 border-2 border-input bg-card px-2 text-xs" value={areaOptions.includes(draft.area) ? draft.area : defaultArea} onChange={(event) => updateDraft("area", event.target.value)}>{(areaOptions.includes(draft.area) ? areaOptions : [draft.area, ...areaOptions]).filter((area, index, list) => list.indexOf(area) === index).map((area) => <option key={area}>{area}</option>)}</select></label>
+                  <label className="grid gap-1 text-[10px] font-semibold">Area<Input required list="event-area-suggestions" value={draft.area} onChange={(event) => updateDraft("area", event.target.value)} placeholder="e.g. Maitama" /><datalist id="event-area-suggestions">{areaOptions.map((area) => <option key={area} value={area} />)}</datalist></label>
                   <label className="grid gap-1 text-[10px] font-semibold sm:col-span-2">Venue<Input value={draft.venue} onChange={(event) => updateDraft("venue", event.target.value)} /></label>
                   <label className="grid gap-1 text-[10px] font-semibold sm:col-span-2">Languages, separated by commas<Input value={draft.languages.join(", ")} onChange={(event) => updateDraft("languages", event.target.value.split(",").map((language) => language.trim()).filter(Boolean))} /></label>
                   <label className="grid gap-1 text-[10px] font-semibold">Listing tag<Input placeholder="Optional" value={draft.label} onChange={(event) => updateDraft("label", event.target.value)} /></label>
