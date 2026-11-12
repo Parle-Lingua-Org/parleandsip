@@ -258,7 +258,7 @@ export function PublicHome() {
               ))}
             </div>
           ) : (
-            <div className="mt-4 flex min-h-48 flex-col items-center justify-center gap-3 border-2 border-dashed border-dap-text-soft text-center text-muted-foreground"><Search size={21} /><p className="text-xs">No experiences found. Try another activity or area.</p><Button variant="ghost" size="sm" onClick={() => { setQuery(""); setCategory("All experiences"); setArea(areaFilterAll); }}>Clear filters</Button></div>
+            <div className="mt-4 flex min-h-48 flex-col items-center justify-center gap-3 border-2 border-dashed border-dap-text-soft text-center text-muted-foreground"><Search size={21} /><p className="text-xs">No experiences found. Try another search.</p><Button variant="ghost" size="sm" onClick={() => setQuery("")}>Clear search</Button></div>
           )}
         </section>
 
