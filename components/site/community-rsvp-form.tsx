@@ -126,7 +126,7 @@ export function CommunityRsvpForm({ onDone }: { onDone?: () => void }) {
       <section className="grid gap-3 sm:grid-cols-2">
         <label className="grid gap-1 text-[10px] font-semibold sm:col-span-2">1. Email *<Input type="email" required value={email} onChange={(event) => setEmail(event.target.value)} /></label>
         <label className="grid gap-1 text-[10px] font-semibold">2. Full name *<Input required value={fullName} onChange={(event) => setFullName(event.target.value)} /></label>
-        <label className="grid gap-1 text-[10px] font-semibold">3. Prefered name on ticket *<Input required value={ticketName} onChange={(event) => setTicketName(event.target.value)} placeholder="First name for the ticket" /></label>
+        <label className="grid gap-1 text-[10px] font-semibold">3. Prefered name for ticket *<Input required value={ticketName} onChange={(event) => setTicketName(event.target.value)} placeholder="First name for the ticket" /></label>
         <label className="grid gap-1 text-[10px] font-semibold sm:col-span-2">4. WhatsApp number *<Input required value={whatsapp} onChange={(event) => setWhatsapp(event.target.value)} placeholder="+234..." /></label>
       </section>
 
@@ -180,7 +180,7 @@ export function CommunityRsvpForm({ onDone }: { onDone?: () => void }) {
           </div>
           {hopingToGain.includes("Other") ? <Input required value={hopingToGainOther} onChange={(event) => setHopingToGainOther(event.target.value)} placeholder="Tell us more" /> : null}
         </fieldset>
-        <label className="grid gap-1 text-[10px] font-semibold">9. What are you expecting the most at the event? *<Textarea required rows={3} value={expectingMost} onChange={(event) => setExpectingMost(event.target.value)} /></label>
+        <label className="grid gap-1 text-[10px] font-semibold">9. What are you expecting the most from the community? *<Textarea required rows={3} value={expectingMost} onChange={(event) => setExpectingMost(event.target.value)} /></label>
         <label className="grid gap-1 text-[10px] font-semibold">10. Any allergies or dietary requirements? *<Input required value={allergies} onChange={(event) => setAllergies(event.target.value)} placeholder="None, or list them" /></label>
       </section>
 
@@ -210,7 +210,7 @@ export function CommunityRsvpForm({ onDone }: { onDone?: () => void }) {
         </fieldset>
       </section>
 
-      <Button type="submit" className="w-full" disabled={busy}>{busy ? "Submitting…" : "Join Community"}</Button>
+      <Button type="submit" className="w-full" disabled={busy}>{busy ? "Submitting…" : "Join The Community"}</Button>
     </form>
   );
 }
