@@ -40,6 +40,7 @@ export function PublicHome() {
   const [query, setQuery] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
   const [createFormOpen, setCreateFormOpen] = useState(false);
+  const [comingSoonOpen, setComingSoonOpen] = useState(false);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [feedbackName, setFeedbackName] = useState("");
   const [feedbackEmail, setFeedbackEmail] = useState("");
@@ -193,7 +194,9 @@ export function PublicHome() {
             <span className="font-mono text-[8px] tracking-wide">02 / YOUR KIND OF PEOPLE</span>
             <div className="mt-3 flex -space-x-1.5" aria-hidden="true"><span className="grid size-7 place-items-center rounded-full border border-foreground bg-dap-avatar text-[9px] font-bold">F</span><span className="grid size-7 place-items-center rounded-full border border-foreground bg-primary text-[9px] font-bold">C</span><span className="grid size-7 place-items-center rounded-full border border-foreground bg-dap-blue text-[9px] font-bold">A</span><span className="grid size-7 place-items-center rounded-full border border-foreground bg-foreground text-[9px] font-bold text-card">+</span></div>
             <strong className="mt-2 max-w-lg text-xl leading-tight">{content.communityTitle}</strong>
-            <a className="mt-auto inline-flex items-center gap-1.5 pt-3 text-[9px] font-bold" href="#events">{content.communityCta} <ArrowRight size={13} /></a>
+            <button type="button" className="mt-auto inline-flex items-center gap-1.5 pt-3 text-[9px] font-bold" onClick={() => setComingSoonOpen(true)}>
+              {content.communityCta || "Find your people"} <ArrowRight size={13} />
+            </button>
           </Card>
         </section>
 
@@ -294,6 +297,20 @@ export function PublicHome() {
             <DialogDescription className="mt-1 text-xs text-muted-foreground">Fill the form below. We&apos;ll use your answers for your place and ticket name.</DialogDescription>
           </div>
           <CommunityRsvpForm onDone={() => setCreateFormOpen(false)} />
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={comingSoonOpen} onOpenChange={setComingSoonOpen}>
+        <DialogContent className="p-0">
+          <div className="p-5 text-center sm:p-6">
+            <span className="mx-auto grid size-11 place-items-center border-2 border-foreground bg-primary"><UsersRound size={21} /></span>
+            <p className="mt-4 font-mono text-[9px] text-muted-foreground">COMMUNITY</p>
+            <DialogTitle className="mt-1 text-2xl font-bold">Coming soon.</DialogTitle>
+            <DialogDescription className="mx-auto mt-2 max-w-xs text-xs leading-5 text-muted-foreground">
+              We&apos;re still shaping this space for Francophones and Francophiles. Check back soon.
+            </DialogDescription>
+            <Button type="button" className="mt-5 w-full" onClick={() => setComingSoonOpen(false)}>Got it</Button>
+          </div>
         </DialogContent>
       </Dialog>
 
