@@ -143,6 +143,30 @@ create table if not exists public.site_settings (
   updated_at timestamptz not null default now()
 );
 
+-- Community RSVP / "Join our community" submissions (replaces Google Form)
+create table if not exists public.community_rsvps (
+  id uuid primary key default gen_random_uuid(),
+  email text not null,
+  full_name text not null,
+  ticket_name text not null,
+  whatsapp text not null,
+  learning_french text not null,
+  french_level text not null,
+  motivations text[] not null default '{}',
+  motivations_other text not null default '',
+  hoping_to_gain text[] not null default '{}',
+  hoping_to_gain_other text not null default '',
+  expecting_most text not null default '',
+  allergies text not null default '',
+  heard_from text not null,
+  heard_from_other text not null default '',
+  following_social text not null,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists community_rsvps_created_idx
+  on public.community_rsvps (created_at desc);
+
 insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 values (
   'parle-sip-media',
@@ -702,10 +726,38 @@ begin
 end;
 $$;
 
+-- Site pages (home, about, contact, nav) live in site_settings.content jsonb.
+-- About / Contact fields: navAbout, aboutEyebrow, aboutTitle, aboutBody, aboutImage,
+-- contactPageEyebrow, contactPageTitle, contactPageDescription (+ contactEmail/WhatsApp/social).
 insert into public.site_settings (setting_key, content, theme)
 values (
   'main',
-  '{"brandName":"Parle & Sip","footerLocation":"ABUJA · NIGERIA","footerCurrency":"NGN · ₦ NAIRA","cityName":"Abuja","areaFilterAll":"All Abuja","eventAreas":"Maitama, Wuse, Garki, Asokoro, Jabi, Gwarinpa","heroTitle":"A little French.","heroSecondLine":"A lot to share.","footerText":"Learn. Connect. Experience. Parlez et profitez !","ticketTemplate":{"brandName":"PARLE & SIP","slugTag":"BIGGEST FRENCH GATHERING IN ABUJA","passLabel":"EVENT PASS","qrInstruction":"SHOW THIS QR CODE AT THE DOOR","brandSize":24,"qrSize":132,"qrOffsetY":84,"notchY":250,"showLogoInQr":true,"logoInQrPercent":18}}'::jsonb,
+  '{
+    "brandName":"Parle & Sip",
+    "navExplore":"Explore experiences",
+    "navAbout":"About us",
+    "navContact":"Contact us",
+    "aboutEyebrow":"OUR STORY",
+    "aboutTitle":"French, culture & connection.",
+    "aboutBody":"Parle & Sip brings French learners, Francophones, Francophiles and culture enthusiasts together in Abuja to practice French, explore Francophone culture and make meaningful connections.\n\nWe gather around conversation, food, art, games and shared curiosity — so learning French feels like living it.",
+    "aboutImage":"",
+    "contactPageEyebrow":"GET IN TOUCH",
+    "contactPageTitle":"Say hello.",
+    "contactPageDescription":"Questions about a seat, a collaboration, or the next gathering. Write, message, or find us on social.",
+    "footerLocation":"ABUJA · NIGERIA",
+    "footerCurrency":"NGN · ₦ NAIRA",
+    "cityName":"Abuja",
+    "areaFilterAll":"All Abuja",
+    "eventAreas":"Maitama, Wuse, Garki, Asokoro, Jabi, Gwarinpa",
+    "heroTitle":"A little French.",
+    "heroSecondLine":"A lot to share.",
+    "footerText":"Learn. Connect. Experience. Parlez et profitez !",
+    "contactEmail":"Parlelinguaservices@gmail.com",
+    "contactWhatsapp":"+2349162777004",
+    "instagramHandle":"parlesip",
+    "tiktokHandle":"parlesip",
+    "ticketTemplate":{"brandName":"PARLE & SIP","slugTag":"BIGGEST FRENCH GATHERING IN ABUJA","passLabel":"EVENT PASS","qrInstruction":"SHOW THIS QR CODE AT THE DOOR","brandSize":24,"qrSize":132,"qrOffsetY":84,"notchY":250,"showLogoInQr":true,"logoInQrPercent":18}
+  }'::jsonb,
   '{"background":"#f5f6f8","foreground":"#192637","primary":"#9a1f26","secondary":"#e5e9ef","muted":"#edf0f4","mutedForeground":"#526173","accent":"#be8f3f","ring":"#9a1f26","info":"#dce4ef"}'::jsonb
 )
 on conflict (setting_key) do update set
@@ -787,6 +839,7 @@ alter table public.ticket_orders enable row level security;
 alter table public.ticket_order_items enable row level security;
 alter table public.ticket_codes enable row level security;
 alter table public.site_settings enable row level security;
+alter table public.community_rsvps enable row level security;
 
 drop policy if exists "profiles_read_self_or_admin" on public.profiles;
 create policy "profiles_read_self_or_admin" on public.profiles
@@ -839,6 +892,17 @@ using (setting_key = 'main');
 
 drop policy if exists "admins_manage_site_settings" on public.site_settings;
 create policy "admins_manage_site_settings" on public.site_settings
+for all to authenticated
+using ((select public.is_admin()))
+with check ((select public.is_admin()));
+
+drop policy if exists "admins_read_community_rsvps" on public.community_rsvps;
+create policy "admins_read_community_rsvps" on public.community_rsvps
+for select to authenticated
+using ((select public.is_admin()));
+
+drop policy if exists "admins_manage_community_rsvps" on public.community_rsvps;
+create policy "admins_manage_community_rsvps" on public.community_rsvps
 for all to authenticated
 using ((select public.is_admin()))
 with check ((select public.is_admin()));
@@ -896,7 +960,7 @@ for select to authenticated
 using ((select public.is_admin()));
 
 grant select on public.events, public.event_images, public.ticket_tiers, public.site_settings to anon, authenticated;
-grant select on public.profiles, public.ticket_orders, public.ticket_order_items to authenticated;
+grant select on public.profiles, public.ticket_orders, public.ticket_order_items, public.community_rsvps to authenticated;
 grant select on public.ticket_codes to authenticated;
 grant insert, update, delete on public.events, public.event_images, public.ticket_tiers, public.site_settings to authenticated;
 grant update on public.ticket_orders to authenticated;

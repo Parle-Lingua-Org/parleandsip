@@ -3,11 +3,10 @@
 import { useState, type ReactNode } from "react";
 import { ArrowDownRight, ArrowRight, MapPin, Menu, X } from "lucide-react";
 import { BrandLogo } from "@/components/site/brand-logo";
+import { CommunityRsvpForm } from "@/components/site/community-rsvp-form";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import type { SiteContent } from "@/lib/site-data";
-
-const createWithFormUrl = "https://docs.google.com/forms/d/1LhlPUi_uVlC41u3JguE9TOTjKlaISiVqs1AbKIi3Q9k/viewform?embedded=true";
 
 type SiteChromeProps = {
   content: SiteContent;
@@ -64,7 +63,7 @@ export function SiteChrome({ content, children, active = "home" }: SiteChromePro
             <DialogTitle className="mt-1 text-xl font-bold">{content.proCta}</DialogTitle>
             <DialogDescription className="mt-1 text-xs text-muted-foreground">Fill the form below. We&apos;ll use your answers for your place and ticket name.</DialogDescription>
           </div>
-          <iframe title="Join our community form" src={createWithFormUrl} className="h-[min(70dvh,720px)] w-full border-0 bg-card" loading="lazy" />
+          <CommunityRsvpForm onDone={() => setCreateFormOpen(false)} />
         </DialogContent>
       </Dialog>
     </main>

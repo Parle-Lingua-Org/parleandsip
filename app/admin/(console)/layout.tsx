@@ -3,7 +3,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { CalendarDays, Eye, KeyRound, LayoutDashboard, LogOut, Palette, ScanLine, Stamp, Ticket } from "lucide-react";
+import { CalendarDays, ClipboardList, Eye, KeyRound, LayoutDashboard, LogOut, Palette, ScanLine, Stamp, Ticket } from "lucide-react";
 import { BrandLogo } from "@/components/site/brand-logo";
 import { Button } from "@/components/ui/button";
 import { useSiteSettingsQuery } from "@/hooks/use-site-data";
@@ -13,6 +13,7 @@ const navigation = [
   { href: "/admin", label: "Overview", icon: LayoutDashboard },
   { href: "/admin/content", label: "Site content", icon: Palette },
   { href: "/admin/events", label: "Events & tickets", icon: CalendarDays },
+  { href: "/admin/rsvps", label: "Community RSVPs", icon: ClipboardList },
   { href: "/admin/tickets", label: "Ticket template", icon: Stamp },
   { href: "/admin/orders", label: "Orders", icon: Ticket },
   { href: "/admin/check-in", label: "Scan tickets", icon: ScanLine },
