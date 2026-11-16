@@ -6,12 +6,42 @@ import { useSiteSettingsQuery } from "@/hooks/use-site-data";
 import { initialSiteData } from "@/lib/site-data";
 
 function PolicyBlock({ id, title, body }: { id: string; title: string; body: string }) {
-  const paragraphs = body.split(/\n+/).map((part) => part.trim()).filter(Boolean);
+  const blocks = body
+    .split(/\n\n+/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+
   return (
     <section id={id} className="scroll-mt-8 border-t-2 border-foreground pt-6">
       <h2 className="text-xl font-bold tracking-tight">{title}</h2>
       <div className="mt-3 space-y-3 text-sm leading-7 text-muted-foreground">
-        {paragraphs.map((paragraph) => <p key={paragraph}>{paragraph}</p>)}
+        {blocks.map((block) => {
+          const lines = block.split(/\n/).map((line) => line.trim()).filter(Boolean);
+          const bulletLines = lines.filter((line) => /^[-•·]/.test(line));
+          if (bulletLines.length === lines.length && lines.length > 0) {
+            return (
+              <ul key={block} className="list-disc space-y-2 pl-5">
+                {lines.map((line) => (
+                  <li key={line}>{line.replace(/^[-•·]\s*/, "")}</li>
+                ))}
+              </ul>
+            );
+          }
+          if (bulletLines.length > 0) {
+            const intro = lines.filter((line) => !/^[-•·]/.test(line));
+            return (
+              <div key={block} className="space-y-3">
+                {intro.map((line) => <p key={line}>{line}</p>)}
+                <ul className="list-disc space-y-2 pl-5">
+                  {bulletLines.map((line) => (
+                    <li key={line}>{line.replace(/^[-•·]\s*/, "")}</li>
+                  ))}
+                </ul>
+              </div>
+            );
+          }
+          return <p key={block}>{block}</p>;
+        })}
       </div>
     </section>
   );
@@ -20,7 +50,16 @@ function PolicyBlock({ id, title, body }: { id: string; title: string; body: str
 export function PoliciesPage() {
   const settingsQuery = useSiteSettingsQuery();
   const content = settingsQuery.data?.content ?? initialSiteData.content;
-  const faq = content.policiesFaq?.length ? content.policiesFaq : initialSiteData.content.policiesFaq;
+
+  const sections = [
+    { id: "ticket-purchase", title: "1. Ticket purchases and registration", body: content.policiesTicketPurchase },
+    { id: "payment-terms", title: "2. Payment terms", body: content.policiesPayment },
+    { id: "refund-cancellation", title: "3. Refund policy", body: content.policiesRefund },
+    { id: "ticket-transfer", title: "4. Ticket transfer policy", body: content.policiesTicketTransfer },
+    { id: "event-changes", title: "5. Event changes and postponement", body: content.policiesEventChanges },
+    { id: "participant-responsibilities", title: "6. Participant responsibilities", body: content.policiesParticipantResponsibilities },
+    { id: "contact-enquiries", title: "7. Contact and enquiries", body: content.policiesContact },
+  ];
 
   return (
     <SiteChrome content={content} active="policies">
@@ -31,38 +70,37 @@ export function PoliciesPage() {
             POLICIES
           </p>
           <h1 className="mt-4 text-[36px] font-bold leading-[1.02] tracking-[-1.5px] sm:text-[46px]">
-            {settingsQuery.isLoading ? <Skeleton className="h-12 w-72" /> : "Ticket & community policies"}
+            {settingsQuery.isLoading ? <Skeleton className="h-12 w-72" /> : "Ticketing, payment, refund & cancellation policy"}
           </h1>
           <p className="mt-3 max-w-2xl text-sm leading-7 text-muted-foreground">
-            Ticket purchase, refunds, transfers and answers to common questions.
+            {content.policiesIntro}
           </p>
 
           <nav className="mt-6 flex flex-wrap gap-2 text-[10px] font-semibold">
-            <a className="border-2 border-foreground bg-card px-3 py-2 shadow-[2px_2px_0_var(--foreground)]" href="#ticket-purchase">Ticket purchase</a>
-            <a className="border-2 border-foreground bg-card px-3 py-2 shadow-[2px_2px_0_var(--foreground)]" href="#refund-cancellation">Refund &amp; cancellation</a>
-            <a className="border-2 border-foreground bg-card px-3 py-2 shadow-[2px_2px_0_var(--foreground)]" href="#faq">FAQ</a>
-            <a className="border-2 border-foreground bg-card px-3 py-2 shadow-[2px_2px_0_var(--foreground)]" href="#ticket-transfer">Ticket transfer</a>
+            {sections.map((section) => (
+              <a
+                key={section.id}
+                className="border-2 border-foreground bg-card px-3 py-2 shadow-[2px_2px_0_var(--foreground)]"
+                href={`#${section.id}`}
+              >
+                {section.title.replace(/^\d+\.\s*/, "")}
+              </a>
+            ))}
           </nav>
 
           <div className="mt-8 space-y-8">
             {settingsQuery.isLoading ? (
-              Array.from({ length: 4 }).map((_, index) => <Skeleton key={index} className="h-32 w-full" />)
+              Array.from({ length: 7 }).map((_, index) => <Skeleton key={index} className="h-32 w-full" />)
             ) : (
               <>
-                <PolicyBlock id="ticket-purchase" title="Ticket purchase" body={content.policiesTicketPurchase} />
-                <PolicyBlock id="refund-cancellation" title="Refund & cancellation policy" body={content.policiesRefund} />
-                <section id="faq" className="scroll-mt-8 border-t-2 border-foreground pt-6">
-                  <h2 className="text-xl font-bold tracking-tight">FAQ</h2>
-                  <div className="mt-4 space-y-4">
-                    {faq.map((item) => (
-                      <div key={item.question} className="border-2 border-foreground bg-card p-4 shadow-[3px_3px_0_var(--foreground)]">
-                        <h3 className="text-sm font-bold">{item.question}</h3>
-                        <p className="mt-2 text-xs leading-6 text-muted-foreground">{item.answer}</p>
-                      </div>
-                    ))}
-                  </div>
-                </section>
-                <PolicyBlock id="ticket-transfer" title="Ticket transfer terms" body={content.policiesTicketTransfer} />
+                {sections.map((section) => (
+                  <PolicyBlock key={section.id} id={section.id} title={section.title} body={section.body} />
+                ))}
+                {content.policiesClosing ? (
+                  <p className="border-t-2 border-foreground pt-6 text-sm leading-7 text-muted-foreground">
+                    {content.policiesClosing}
+                  </p>
+                ) : null}
                 {content.policiesDocumentUrl ? (
                   <p className="text-xs">
                     <a className="font-semibold underline" href={content.policiesDocumentUrl} target="_blank" rel="noreferrer">

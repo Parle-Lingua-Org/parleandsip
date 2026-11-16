@@ -29,11 +29,25 @@ function normalizeFaqItems(value: unknown, fallback: FaqItem[]): FaqItem[] {
   return items.length ? items : fallback;
 }
 
+function stringOrDefault(value: unknown, fallback: string) {
+  return typeof value === "string" && value.trim() ? value : fallback;
+}
+
 export function normalizeSiteContent(value: unknown): SiteContent {
   const raw = asObject(value);
   const merged = { ...initialSiteData.content, ...raw } as SiteContent;
   merged.aboutFaq = normalizeFaqItems(raw.aboutFaq, initialSiteData.content.aboutFaq);
-  merged.policiesFaq = normalizeFaqItems(raw.policiesFaq, initialSiteData.content.policiesFaq);
+  merged.policiesFaq = [];
+  merged.policiesIntro = stringOrDefault(raw.policiesIntro, initialSiteData.content.policiesIntro);
+  merged.policiesTicketPurchase = stringOrDefault(raw.policiesTicketPurchase, initialSiteData.content.policiesTicketPurchase);
+  merged.policiesPayment = stringOrDefault(raw.policiesPayment, initialSiteData.content.policiesPayment);
+  merged.policiesRefund = stringOrDefault(raw.policiesRefund, initialSiteData.content.policiesRefund);
+  merged.policiesTicketTransfer = stringOrDefault(raw.policiesTicketTransfer, initialSiteData.content.policiesTicketTransfer);
+  merged.policiesEventChanges = stringOrDefault(raw.policiesEventChanges, initialSiteData.content.policiesEventChanges);
+  merged.policiesParticipantResponsibilities = stringOrDefault(raw.policiesParticipantResponsibilities, initialSiteData.content.policiesParticipantResponsibilities);
+  merged.policiesContact = stringOrDefault(raw.policiesContact, initialSiteData.content.policiesContact);
+  merged.policiesClosing = stringOrDefault(raw.policiesClosing, initialSiteData.content.policiesClosing);
+  merged.policiesDocumentUrl = typeof raw.policiesDocumentUrl === "string" ? raw.policiesDocumentUrl : initialSiteData.content.policiesDocumentUrl;
   return merged;
 }
 

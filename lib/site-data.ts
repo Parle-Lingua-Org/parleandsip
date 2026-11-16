@@ -44,9 +44,15 @@ export type SiteContent = {
   aboutBody: string;
   aboutImage: string;
   aboutFaq: FaqItem[];
+  policiesIntro: string;
   policiesTicketPurchase: string;
+  policiesPayment: string;
   policiesRefund: string;
   policiesTicketTransfer: string;
+  policiesEventChanges: string;
+  policiesParticipantResponsibilities: string;
+  policiesContact: string;
+  policiesClosing: string;
   policiesFaq: FaqItem[];
   policiesDocumentUrl: string;
   contactPageEyebrow: string;
@@ -146,13 +152,16 @@ export const initialSiteData: SiteData = {
       { question: "Do I need to speak fluent French?", answer: "No. Come as you are — we create space for beginners through fluent speakers." },
       { question: "How do tickets work?", answer: "Choose an experience, pick a ticket type, and complete payment. Your QR ticket is emailed after confirmation." },
     ],
-    policiesTicketPurchase: "Tickets are sold for specific Parle & Sip experiences. Your purchase confirms your place for the selected date, venue and ticket type. A confirmation email with your QR ticket is sent after successful payment.",
-    policiesRefund: "Refund and cancellation requests must be sent to Parle & Sip before the experience. Approved refunds follow our processing timeline. No-shows are not eligible for refunds. Parle & Sip may reschedule or cancel an experience and will offer a transfer or refund in those cases.",
-    policiesTicketTransfer: "Tickets may be transferred to another person before the experience by contacting Parle & Sip with the original buyer details and the new guest name. The QR ticket remains the entry pass and should only be presented by the attending guest.",
-    policiesFaq: [
-      { question: "Can I change my ticket type after purchase?", answer: "Contact us as soon as possible. Changes depend on availability and may require a price adjustment." },
-      { question: "What if an event is postponed?", answer: "Your ticket remains valid for the new date, or you can request a refund according to our refund policy." },
-    ],
+    policiesIntro: "Please read the following terms carefully before purchasing a ticket or registering for any of our events.",
+    policiesTicketPurchase: "- All tickets must be purchased through the official Parle & Sip registration and payment platform.\n- A ticket is considered confirmed once payment has been successfully completed and payment confirmation has been issued.\n- Participants are encouraged to provide accurate personal and contact information during registration.\n- Each ticket grants admission to the specific event/programme for which it was purchased and is subject to the conditions stated.",
+    policiesPayment: "- All ticket prices are displayed in Nigerian Naira (₦), unless otherwise stated.\n- Ticket prices vary depending on the event, experience and ticket category.\n- The applicable ticket price and available options will be clearly displayed on the relevant page before purchase.\n- Any applicable payment processing or service fees will be disclosed before checkout.\n- Payments must be completed through the official Parle & Sip payment platform.\n- Participants are advised to retain their payment confirmation as proof of purchase.",
+    policiesRefund: "- All confirmed ticket purchases are generally non-refundable.\n- If a participant is unable to attend an event, they may request a ticket transfer in accordance with our Ticket Transfer Policy.\n- If Parle & Sip cancels an event, affected participants will be offered a full refund or the option to transfer their payment to a rescheduled event, as applicable.\n- Refunds approved by Parle & Sip will be processed through an appropriate payment method. Processing timelines may depend on the payment provider.",
+    policiesTicketTransfer: "If you are unable to attend an event, you may transfer your ticket to another person, subject to approval by the Parle & Sip team.\n\n- All transfer requests must be submitted at least 48 hours before the event.\n- The original ticket holder must provide the new attendee's full name and contact information.\n- Each ticket may only be transferred once.\n- Transfers must be confirmed by the Parle & Sip team before the new attendee can use the ticket.\n- Ticket transfers are free of charge.",
+    policiesEventChanges: "Parle & Sip reserves the right to make reasonable adjustments to an event's schedule, activities, speakers or venue change where necessary. In the event of a postponement or change, participants will be informed promptly and provided with relevant information regarding their existing registrations and available options.\n\nWhere an event is rescheduled, tickets may remain valid for the new date, subject to communication from the Parle & Sip team.",
+    policiesParticipantResponsibilities: "Participants are expected to:\n\n- Provide accurate registration information.\n- Respect event guidelines and other attendees.\n- Arrive at the venue at the communicated time.\n- Follow any specific instructions or requirements communicated before the event.",
+    policiesContact: "For questions regarding ticket purchases, payment confirmation, refunds, ticket transfers or event arrangements, please contact the Parle & Sip team through the contact details provided on our website.",
+    policiesClosing: "By completing a ticket purchase, you acknowledge that you have read and agreed to these terms.\n\nParle & Sip – Learn. Connect. Experience.",
+    policiesFaq: [],
     policiesDocumentUrl: "",
     contactPageEyebrow: "GET IN TOUCH",
     contactPageTitle: "Say hello.",

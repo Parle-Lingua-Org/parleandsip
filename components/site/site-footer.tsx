@@ -17,9 +17,10 @@ export function SiteFooter({ content }: { content: SiteContent }) {
         </div>
         <nav className="mt-4 flex flex-wrap gap-x-4 gap-y-2 border-t border-dap-border-soft pt-4 text-[10px]" aria-label="Policies">
           <a className="font-semibold hover:underline" href="/policies#ticket-purchase">Ticket purchase</a>
+          <a className="font-semibold hover:underline" href="/policies#payment-terms">Payment</a>
           <a className="font-semibold hover:underline" href="/policies#refund-cancellation">Refund &amp; cancellation</a>
-          <a className="font-semibold hover:underline" href="/policies#faq">FAQ</a>
           <a className="font-semibold hover:underline" href="/policies#ticket-transfer">Ticket transfer</a>
+          <a className="font-semibold hover:underline" href="/policies#event-changes">Event changes</a>
           <a className="text-muted-foreground hover:underline" href="/about#faq">About FAQ</a>
         </nav>
       </footer>

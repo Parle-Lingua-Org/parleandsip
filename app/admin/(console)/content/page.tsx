@@ -39,7 +39,18 @@ const contentSections: { title: string; description: string; fields: { key: keyo
   { title: "Contact us page", description: "Intro copy for /contact. Contact details below still drive the cards and form.", fields: [{ key: "contactPageEyebrow", label: "Eyebrow" }, { key: "contactPageTitle", label: "Page title" }, { key: "contactPageDescription", label: "Intro description", multiline: true }] },
   { title: "Bento sections", description: "The supporting homepage panels.", fields: [{ key: "promptTitle", label: "Prompt heading" }, { key: "promptEmphasis", label: "Prompt emphasis" }, { key: "promptCaption", label: "Prompt caption" }, { key: "calendarTitle", label: "Calendar panel title" }, { key: "communityTitle", label: "Community panel headline", multiline: true }, { key: "communityCta", label: "Community link label" }] },
   { title: "Meetups & language pros", description: "Section labels and host callout.", fields: [{ key: "eventsEyebrow", label: "Meetups eyebrow" }, { key: "eventsTitle", label: "Meetups headline" }, { key: "eventsEmphasis", label: "Meetups headline emphasis" }, { key: "proEyebrow", label: "Language pros eyebrow" }, { key: "proTitle", label: "Language pros headline" }, { key: "proEmphasis", label: "Language pros emphasis" }, { key: "proDescription", label: "Language pros description", multiline: true }, { key: "proCta", label: "Join community button label" }] },
-  { title: "Policies page", description: "Public /policies copy. Footer links jump to these sections.", fields: [{ key: "policiesTicketPurchase", label: "Ticket purchase", multiline: true }, { key: "policiesRefund", label: "Refund & cancellation policy", multiline: true }, { key: "policiesTicketTransfer", label: "Ticket transfer terms", multiline: true }, { key: "policiesDocumentUrl", label: "Optional policy document URL (PDF or page)" }] },
+  { title: "Policies page", description: "Public /policies copy. Use a blank line between paragraphs; start bullet lines with -.", fields: [
+    { key: "policiesIntro", label: "Intro", multiline: true },
+    { key: "policiesTicketPurchase", label: "1. Ticket purchases and registration", multiline: true },
+    { key: "policiesPayment", label: "2. Payment terms", multiline: true },
+    { key: "policiesRefund", label: "3. Refund policy", multiline: true },
+    { key: "policiesTicketTransfer", label: "4. Ticket transfer policy", multiline: true },
+    { key: "policiesEventChanges", label: "5. Event changes and postponement", multiline: true },
+    { key: "policiesParticipantResponsibilities", label: "6. Participant responsibilities", multiline: true },
+    { key: "policiesContact", label: "7. Contact and enquiries", multiline: true },
+    { key: "policiesClosing", label: "Closing acknowledgement", multiline: true },
+    { key: "policiesDocumentUrl", label: "Optional policy document URL (PDF or page)" },
+  ] },
   { title: "Location labels", description: "City and footer location labels.", fields: [{ key: "cityName", label: "City name" }, { key: "footerLocation", label: "Footer location label" }] },
   { title: "Contact & social", description: "Email, WhatsApp, Instagram and TikTok shown on Contact us and the homepage.", fields: [{ key: "contactEmail", label: "Contact email" }, { key: "contactWhatsapp", label: "WhatsApp number" }, { key: "instagramHandle", label: "Instagram username" }, { key: "tiktokHandle", label: "TikTok username" }] },
   { title: "Footer", description: "Footer content shown on every public page.", fields: [{ key: "footerText", label: "Footer tagline" }, { key: "footerCurrency", label: "Currency label" }] },
@@ -176,12 +187,6 @@ export default function AdminContentPage() {
         description="Shown on /about under the story. Add, edit or remove Q&As."
         items={contentDraft.aboutFaq?.length ? contentDraft.aboutFaq : [{ question: "", answer: "" }]}
         onChange={(items) => updateContentField("aboutFaq", items)}
-      />
-      <FaqEditor
-        title="Policies FAQ"
-        description="Shown on /policies#faq."
-        items={contentDraft.policiesFaq?.length ? contentDraft.policiesFaq : [{ question: "", answer: "" }]}
-        onChange={(items) => updateContentField("policiesFaq", items)}
       />
 
       <Card className="p-4 shadow-[4px_4px_0_var(--foreground)] sm:p-6">
