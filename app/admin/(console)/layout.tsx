@@ -4,6 +4,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { CalendarDays, ClipboardList, Eye, KeyRound, LayoutDashboard, LogOut, Palette, ScanLine, Stamp, Ticket } from "lucide-react";
+import { AdminPageLoading } from "@/components/admin/page-loading";
 import { BrandLogo } from "@/components/site/brand-logo";
 import { Button } from "@/components/ui/button";
 import { useSiteSettingsQuery } from "@/hooks/use-site-data";
@@ -54,7 +55,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
     router.replace("/admin/login");
   }
 
-  if (!authorized) return <main className="grid min-h-screen place-items-center bg-background"><p className="font-mono text-xs text-muted-foreground">Opening admin workspace…</p></main>;
+  if (!authorized) return <AdminPageLoading fullscreen />;
 
   return (
     <div className="min-h-screen bg-background text-foreground lg:grid lg:grid-cols-[240px_1fr]">

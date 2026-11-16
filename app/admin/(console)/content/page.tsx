@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type FormEvent } from "react";
 import { Check, Palette, Plus, Save, Sparkles, Trash2 } from "lucide-react";
+import { AdminPageLoading } from "@/components/admin/page-loading";
 import { BrandLogo } from "@/components/site/brand-logo";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -9,7 +10,6 @@ import { Card } from "@/components/ui/card";
 import { ImagePicker } from "@/components/ui/image-picker";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Skeleton } from "@/components/ui/skeleton";
 import { useAdminEventsQuery, useSaveSiteSettingsMutation, useSiteSettingsQuery } from "@/hooks/use-site-data";
 import { initialSiteData, type FaqItem, type SiteContent, type SiteTheme } from "@/lib/site-data";
 
@@ -145,14 +145,8 @@ export default function AdminContentPage() {
     }
   }
 
-  if (settingsQuery.isLoading) {
-    return (
-      <div className="space-y-4">
-        <Skeleton className="h-10 w-56" />
-        <Skeleton className="h-40 w-full" />
-        <Skeleton className="h-64 w-full" />
-      </div>
-    );
+  if (settingsQuery.isLoading || !settingsQuery.data) {
+    return <AdminPageLoading rows={4} />;
   }
 
   return (

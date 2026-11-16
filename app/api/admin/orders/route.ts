@@ -2,6 +2,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 
 type OrderItem = { ticket_name: string; quantity: number };
+type TicketCode = { ticket_code: string; ticket_number: number; ticket_name: string; status: string };
 type EventRelation = { title: string } | { title: string }[] | null;
 type OrderRow = {
   id: string;
@@ -16,6 +17,7 @@ type OrderRow = {
   email_status: string;
   events: EventRelation;
   ticket_order_items: OrderItem[] | null;
+  ticket_codes: TicketCode[] | null;
 };
 
 function eventTitle(events: EventRelation) {
@@ -34,12 +36,21 @@ export async function GET() {
   const admin = createAdminClient();
   const { data, error: ordersError } = await admin
     .from("ticket_orders")
-    .select("id, public_reference, buyer_name, buyer_email, status, subtotal_ngn, created_at, paid_at, expires_at, email_status, events(title), ticket_order_items(ticket_name, quantity)")
+    .select("id, public_reference, buyer_name, buyer_email, status, subtotal_ngn, created_at, paid_at, expires_at, email_status, events(title), ticket_order_items(ticket_name, quantity), ticket_codes(ticket_code, ticket_number, ticket_name, status)")
     .order("created_at", { ascending: false });
   if (ordersError) return Response.json({ error: ordersError.message }, { status: 500 });
 
   const orders = ((data ?? []) as OrderRow[]).map((order) => {
     const items = order.ticket_order_items ?? [];
+    const tickets = (order.ticket_codes ?? [])
+      .slice()
+      .sort((a, b) => a.ticket_number - b.ticket_number)
+      .map((ticket) => ({
+        code: ticket.ticket_code,
+        number: ticket.ticket_number,
+        name: ticket.ticket_name,
+        status: ticket.status,
+      }));
     return {
       id: order.id,
       reference: order.public_reference,
@@ -54,6 +65,7 @@ export async function GET() {
       createdAt: order.created_at,
       paidAt: order.paid_at,
       expiresAt: order.expires_at,
+      tickets,
     };
   });
 

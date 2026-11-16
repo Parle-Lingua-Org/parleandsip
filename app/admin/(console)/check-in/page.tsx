@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Camera, Check, QrCode, ScanLine, X } from "lucide-react";
+import { AdminPageLoading } from "@/components/admin/page-loading";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -26,6 +27,7 @@ type CheckInResult = {
 
 export default function AdminCheckInPage() {
   const [events, setEvents] = useState<CheckInEvent[]>([]);
+  const [eventsLoading, setEventsLoading] = useState(true);
   const [eventId, setEventId] = useState("");
   const [eventsError, setEventsError] = useState("");
   const [manualCode, setManualCode] = useState("");
@@ -49,6 +51,7 @@ export default function AdminCheckInPage() {
   useEffect(() => {
     let active = true;
     async function loadEvents() {
+      setEventsLoading(true);
       try {
         const response = await fetch("/api/admin/check-in", { cache: "no-store" });
         const result = await response.json() as { events?: CheckInEvent[]; error?: string };
@@ -62,6 +65,8 @@ export default function AdminCheckInPage() {
         if (list.length === 1) setEventId(list[0].id);
       } catch {
         if (active) setEventsError("Unable to load events.");
+      } finally {
+        if (active) setEventsLoading(false);
       }
     }
     void loadEvents();
@@ -151,6 +156,10 @@ export default function AdminCheckInPage() {
   useEffect(() => () => {
     void stopCamera();
   }, []);
+
+  if (eventsLoading) {
+    return <AdminPageLoading rows={2} />;
+  }
 
   return (
     <div className="space-y-6">

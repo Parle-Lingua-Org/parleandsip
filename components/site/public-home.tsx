@@ -27,7 +27,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import { usePublishedEventsQuery, useSiteSettingsQuery } from "@/hooks/use-site-data";
-import { remainingForTier, upcomingEvents, type EventRecord } from "@/lib/events-shared";
+import { isEventSalesOpen, remainingForTier, upcomingEvents, type EventRecord } from "@/lib/events-shared";
 import { formatNaira, initialSiteData } from "@/lib/site-data";
 import { BrandLogo } from "@/components/site/brand-logo";
 import { CommunityRsvpForm } from "@/components/site/community-rsvp-form";
@@ -78,6 +78,13 @@ export function PublicHome() {
   const loadingHome = settingsQuery.isLoading || eventsQuery.isLoading;
 
   function openTickets(event: EventRecord) {
+    if (!isEventSalesOpen(event)) {
+      setSelectedEvent(event);
+      setOrderComplete(false);
+      setCheckoutUrl("");
+      setOrderError("Ticket sales for this experience have closed.");
+      return;
+    }
     setSelectedEvent(event);
     setSelectedImageIndex(0);
     setSelectedTierId(event.ticketTiers.find((tier) => remainingForTier(tier) > 0)?.id ?? event.ticketTiers[0]?.id ?? "");
@@ -91,6 +98,10 @@ export function PublicHome() {
       const fresh = result.data?.find((item) => item.id === event.id);
       if (!fresh) return;
       setSelectedEvent((current) => (current?.id === fresh.id ? fresh : current));
+      if (!isEventSalesOpen(fresh)) {
+        setOrderError("Ticket sales for this experience have closed.");
+        return;
+      }
       setSelectedTierId((current) => {
         const stillValid = fresh.ticketTiers.some((tier) => tier.id === current && remainingForTier(tier) > 0);
         if (stillValid) return current;
@@ -102,6 +113,10 @@ export function PublicHome() {
   async function submitCheckout(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!selectedEvent) return;
+    if (!isEventSalesOpen(selectedEvent)) {
+      setOrderError("Ticket sales for this experience have closed.");
+      return;
+    }
     if (!selectedTier || quantity > selectedTierRemaining) {
       setOrderError("That ticket type has sold out. Choose another option.");
       return;
@@ -162,25 +177,50 @@ export function PublicHome() {
       <div className="mx-auto max-w-[1200px] px-4 sm:px-8">
         <section className="flex min-h-[225px] items-end justify-between gap-6 py-9 md:py-11">
           <div className="max-w-3xl">
-            <p className="flex items-center gap-2 font-mono text-[9px] tracking-wider text-muted-foreground"><span className="size-2 border border-foreground bg-accent" />{content.heroEyebrow}</p>
-            <h1 className="mt-4 text-[42px] font-bold leading-[.98] tracking-[-2px] sm:text-[52px]">{content.heroTitle}<br /><span className="text-dap-green">{content.heroSecondLine}</span></h1>
-            <p className="mt-3 max-w-xl text-xs leading-6 text-muted-foreground">{content.heroDescription}</p>
+            {settingsQuery.isLoading ? (
+              <div className="space-y-3" role="status" aria-label="Loading">
+                <Skeleton className="h-3 w-40" />
+                <Skeleton className="h-12 w-72 max-w-full" />
+                <Skeleton className="h-12 w-64 max-w-full" />
+                <Skeleton className="h-16 w-full max-w-xl" />
+              </div>
+            ) : (
+              <>
+                <p className="flex items-center gap-2 font-mono text-[9px] tracking-wider text-muted-foreground"><span className="size-2 border border-foreground bg-accent" />{content.heroEyebrow}</p>
+                <h1 className="mt-4 text-[42px] font-bold leading-[.98] tracking-[-2px] sm:text-[52px]">{content.heroTitle}<br /><span className="text-dap-green">{content.heroSecondLine}</span></h1>
+                <p className="mt-3 max-w-xl text-xs leading-6 text-muted-foreground">{content.heroDescription}</p>
+              </>
+            )}
           </div>
           <a className="mb-1 hidden shrink-0 items-center gap-2 font-mono text-[8px] tracking-wide text-muted-foreground lg:flex" href="#events">SCROLL TO FIND YOUR NEXT EXPERIENCE <ArrowDownRight size={16} className="text-foreground" /></a>
         </section>
 
         <section className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-12" aria-label="Featured Parle & Sip experiences">
           <Card className="relative min-h-[390px] overflow-hidden bg-dap-hero text-card shadow-[4px_4px_0_var(--foreground)] md:row-span-2 xl:col-span-6">
-            {featuredEvent && (featuredEvent.image || content.heroImage) && <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `linear-gradient(180deg,rgb(var(--dap-overlay-rgb)/.04) 18%,rgb(var(--dap-overlay-rgb)/.78) 100%),url("${featuredEvent.image || content.heroImage}")` }} />}
-            <Badge className="absolute left-4 top-4 gap-1.5"><Sparkles size={12} /> THIS WEEK&apos;S PICK</Badge>
-            <div className="absolute inset-x-4 bottom-4 sm:inset-x-5 sm:bottom-5">
-              <p className="font-mono text-[9px] uppercase tracking-wide text-dap-feature-copy">{featuredEvent?.category ?? "Community meetup"}{featuredEvent?.venue ? <> <span className="px-1 text-primary">·</span> {featuredEvent.venue}</> : null}</p>
-              <h2 className="mt-2 text-3xl font-bold leading-tight">{featuredEvent?.title ?? "Your next conversation starts here"}</h2>
-              <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-                <span className="flex items-center gap-1.5 font-mono text-[9px]"><CalendarDays size={14} /> {featuredEvent ? (featuredEvent.time ? `${featuredEvent.dateShort} · ${featuredEvent.time}` : featuredEvent.dateShort) : "TBD"}</span>
-                {featuredEvent && <Button size="sm" onClick={() => openTickets(featuredEvent)}>Get tickets <ArrowRight size={14} /></Button>}
+            {loadingHome ? (
+              <div className="absolute inset-0 flex flex-col justify-end gap-3 bg-muted/80 p-5" role="status" aria-label="Loading featured event">
+                <Skeleton className="h-6 w-32 border-0 bg-background/70" />
+                <Skeleton className="h-10 w-[75%] max-w-md border-0 bg-background/70" />
+                <Skeleton className="h-8 w-48 border-0 bg-background/70" />
               </div>
-            </div>
+            ) : (
+              <>
+                {featuredEvent && (featuredEvent.image || content.heroImage) && <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `linear-gradient(180deg,rgb(var(--dap-overlay-rgb)/.04) 18%,rgb(var(--dap-overlay-rgb)/.78) 100%),url("${featuredEvent.image || content.heroImage}")` }} />}
+                <Badge className="absolute left-4 top-4 gap-1.5"><Sparkles size={12} /> THIS WEEK&apos;S PICK</Badge>
+                <div className="absolute inset-x-4 bottom-4 sm:inset-x-5 sm:bottom-5">
+                  <p className="font-mono text-[9px] uppercase tracking-wide text-dap-feature-copy">{featuredEvent?.category ?? "Community meetup"}{featuredEvent?.venue ? <> <span className="px-1 text-primary">·</span> {featuredEvent.venue}</> : null}</p>
+                  <h2 className="mt-2 text-3xl font-bold leading-tight">{featuredEvent?.title ?? "Your next conversation starts here"}</h2>
+                  <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+                    <span className="flex items-center gap-1.5 font-mono text-[9px]"><CalendarDays size={14} /> {featuredEvent ? (featuredEvent.time ? `${featuredEvent.dateShort} · ${featuredEvent.time}` : featuredEvent.dateShort) : "TBD"}</span>
+                    {featuredEvent && isEventSalesOpen(featuredEvent) ? (
+                      <Button size="sm" onClick={() => openTickets(featuredEvent)}>Get tickets <ArrowRight size={14} /></Button>
+                    ) : featuredEvent ? (
+                      <span className="font-mono text-[9px] text-dap-feature-copy">Sales closed</span>
+                    ) : null}
+                  </div>
+                </div>
+              </>
+            )}
           </Card>
 
           <Card className="flex min-h-[190px] flex-col justify-between bg-primary p-4 shadow-[4px_4px_0_var(--foreground)] xl:col-span-3">
@@ -234,15 +274,30 @@ export function PublicHome() {
             <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {visibleEvents.map((event) => (
                 <Card key={event.id} className="overflow-hidden shadow-[4px_4px_0_var(--foreground)]">
-                  <button type="button" aria-label={`View tickets for ${event.title}`} onClick={() => openTickets(event)} className="relative block aspect-[1.65] w-full border-b-2 border-foreground bg-cover bg-center text-left" style={{ backgroundImage: `linear-gradient(180deg,rgb(var(--dap-overlay-rgb)/.03) 35%,rgb(var(--dap-overlay-rgb)/.58)),url("${event.image}")` }}>
-                    <Badge className="absolute left-2.5 top-2.5">{event.dateShort}</Badge>{event.label && <Badge variant="outline" className="absolute right-2.5 top-2.5 bg-card">{event.label}</Badge>}
+                  <button
+                    type="button"
+                    aria-label={isEventSalesOpen(event) ? `View tickets for ${event.title}` : `${event.title} sales closed`}
+                    onClick={() => openTickets(event)}
+                    className="relative block aspect-[1.65] w-full border-b-2 border-foreground bg-cover bg-center text-left"
+                    style={{ backgroundImage: `linear-gradient(180deg,rgb(var(--dap-overlay-rgb)/.03) 35%,rgb(var(--dap-overlay-rgb)/.58)),url("${event.image}")` }}
+                  >
+                    <Badge className="absolute left-2.5 top-2.5">{event.dateShort}</Badge>
+                    {event.label && <Badge variant="outline" className="absolute right-2.5 top-2.5 bg-card">{event.label}</Badge>}
+                    {!isEventSalesOpen(event) ? <Badge variant="secondary" className="absolute bottom-2.5 left-2.5">Sales closed</Badge> : null}
                   </button>
                   <div className="p-3">
                     <p className="font-mono text-[8px] uppercase text-muted-foreground">{event.category}</p>
                     <h3 className="mt-1 min-h-9 text-sm font-bold leading-tight">{event.title}</h3>
                     <p className="mt-1 flex items-start gap-1 text-[10px] text-muted-foreground"><MapPin size={13} className="mt-0.5 shrink-0" />{event.venue} <span className="text-dap-text-soft">· {event.host}</span></p>
                     {event.summary ? <p className="mt-2 line-clamp-2 text-[10px] leading-5 text-muted-foreground">{event.summary}</p> : null}
-                    <div className="mt-2 flex min-h-9 items-center justify-between gap-2 border-t border-dap-border-soft pt-2"><span className="flex items-center gap-1 text-[9px] text-muted-foreground"><Clock3 size={13} />{event.time || event.dateShort}</span><Button variant="ghost" size="sm" onClick={() => openTickets(event)}>from {formatNaira(Math.min(...event.ticketTiers.map((tier) => tier.price)))} <ArrowRight size={13} /></Button></div>
+                    <div className="mt-2 flex min-h-9 items-center justify-between gap-2 border-t border-dap-border-soft pt-2">
+                      <span className="flex items-center gap-1 text-[9px] text-muted-foreground"><Clock3 size={13} />{event.time || event.dateShort}</span>
+                      {isEventSalesOpen(event) ? (
+                        <Button variant="ghost" size="sm" onClick={() => openTickets(event)}>from {formatNaira(Math.min(...event.ticketTiers.map((tier) => tier.price)))} <ArrowRight size={13} /></Button>
+                      ) : (
+                        <span className="text-[9px] font-semibold text-muted-foreground">Sales closed</span>
+                      )}
+                    </div>
                   </div>
                 </Card>
               ))}
@@ -410,9 +465,17 @@ export function PublicHome() {
           {orderComplete ? <div className="p-5 text-center sm:p-6">
             <span className="mx-auto grid size-11 place-items-center border-2 border-foreground bg-primary"><Ticket size={21} /></span><p className="mt-4 font-mono text-[9px] text-muted-foreground">SECURE PAYSTACK CHECKOUT</p><DialogTitle className="mt-1 text-2xl font-bold">Complete your booking.</DialogTitle><DialogDescription className="mx-auto mt-2 max-w-xs text-xs leading-5 text-muted-foreground">Your ticket is reserved while Paystack confirms payment. We&apos;ll email the QR ticket after confirmation.</DialogDescription>
             <div className="my-5 flex justify-between border-y border-dap-border-muted py-3 text-sm"><span>Order total</span><strong>{formatNaira(ticketPrice * quantity)}</strong></div><Button asChild className="w-full"><a href={checkoutUrl}>Continue to Paystack <ArrowRight size={15} /></a></Button>
-          </div> : <form className="space-y-4 p-4 sm:p-5" onSubmit={submitCheckout}>
+          </div> : !isEventSalesOpen(selectedEvent) ? (
+            <div className="space-y-3 p-4 sm:p-5">
+              <div><p className="font-mono text-[8px] uppercase text-muted-foreground">{selectedEvent.category}</p><DialogTitle className="mt-1 pr-9 text-xl font-bold leading-tight">{selectedEvent.title}</DialogTitle><DialogDescription className="mt-1 flex items-center gap-1 text-[10px] text-muted-foreground"><MapPin size={13} />{selectedEvent.venue}</DialogDescription></div>
+              <p role="status" className="border-2 border-foreground bg-card px-3 py-2 text-xs">Ticket sales for this experience have closed{selectedEvent.salesEndAt ? ` (ended ${new Date(selectedEvent.salesEndAt).toLocaleString("en-NG")})` : ""}.</p>
+            </div>
+          ) : <form className="space-y-4 p-4 sm:p-5" onSubmit={submitCheckout}>
             <div><p className="font-mono text-[8px] uppercase text-muted-foreground">{selectedEvent.category}</p><DialogTitle className="mt-1 pr-9 text-xl font-bold leading-tight">{selectedEvent.title}</DialogTitle><DialogDescription className="mt-1 flex items-center gap-1 text-[10px] text-muted-foreground"><MapPin size={13} />{selectedEvent.venue}</DialogDescription></div>
             {selectedEvent.summary ? <p className="text-[11px] leading-5 text-muted-foreground">{selectedEvent.summary}</p> : null}
+            {selectedEvent.salesEndAt ? (
+              <p className="text-[9px] text-muted-foreground">Payments accepted until {new Date(selectedEvent.salesEndAt).toLocaleString("en-NG")}.</p>
+            ) : null}
             <fieldset><legend className="mb-2 font-mono text-[8px] text-muted-foreground">PICK YOUR PASS</legend><div className="grid gap-2">
               {selectedEvent.ticketTiers.map((tier) => { const remaining = tierRemaining(selectedEvent, tier.id); return <button key={tier.id} type="button" disabled={remaining === 0} aria-pressed={selectedTier?.id === tier.id} onClick={() => { setSelectedTierId(tier.id); setQuantity((count) => Math.min(count, Math.max(remaining, 1))); setOrderError(""); }} className={`flex min-h-14 items-center gap-3 border-2 px-3 text-left disabled:cursor-not-allowed disabled:opacity-50 ${selectedTier?.id === tier.id ? "border-foreground bg-success shadow-[2px_2px_0_var(--foreground)]" : "border-dap-border-muted bg-card"}`}><span className="grid size-4 place-items-center rounded-full border border-foreground">{selectedTier?.id === tier.id && <span className="size-2 rounded-full bg-foreground" />}</span><span className="flex-1"><strong className="block text-[10px]">{tier.name}</strong><small className="text-[9px] text-muted-foreground">{tier.description} · {remaining ? `${remaining} left` : "Sold out"}</small></span><strong className="text-xs">{formatNaira(tier.price)}</strong></button>; })}
             </div></fieldset>

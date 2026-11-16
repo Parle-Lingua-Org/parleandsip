@@ -32,9 +32,16 @@ export async function POST(request: Request) {
     if (eventError || !event) return Response.json({ error: "This experience is not available for booking." }, { status: 404 });
 
     const names = [...new Set(body.items.map((item) => item.name as string))];
-    const { data: tiers, error: tiersError } = await admin.from("ticket_tiers").select("id, name").eq("event_id", event.id).eq("is_active", true).in("name", names);
+    const { data: tiers, error: tiersError } = await admin
+      .from("ticket_tiers")
+      .select("id, name, sales_end_at")
+      .eq("event_id", event.id)
+      .eq("is_active", true)
+      .in("name", names);
     if (tiersError) throw tiersError;
     if (!tiers || tiers.length !== names.length) return Response.json({ error: "One of the selected ticket types is no longer available." }, { status: 409 });
+    const salesClosed = tiers.some((tier) => tier.sales_end_at && new Date(tier.sales_end_at).getTime() <= Date.now());
+    if (salesClosed) return Response.json({ error: "Ticket sales for this experience have closed." }, { status: 409 });
     const tierIds = new Map(tiers.map((tier) => [tier.name, tier.id]));
     const rpcItems = body.items.map((item) => ({ tier_id: tierIds.get(item.name as string), quantity: item.quantity }));
 

@@ -5,9 +5,9 @@ import { CalendarDays, Check, ChevronLeft, ChevronRight, ImagePlus, Plus, Save, 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { AdminPageLoading } from "@/components/admin/page-loading";
 import { ImagePicker } from "@/components/ui/image-picker";
 import { Input } from "@/components/ui/input";
-import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import {
   useAdminEventsQuery,
@@ -30,6 +30,7 @@ type EventDraft = {
   host: string;
   category: string;
   startsAt: string | null;
+  salesEndAt: string | null;
   schedulePrecision: SchedulePrecision;
   venue: string;
   ticketTiers: TicketTier[];
@@ -66,6 +67,7 @@ function newEvent(cityName: string): EventDraft {
     host: "Parle & Sip",
     category: "",
     startsAt: starts.toISOString(),
+    salesEndAt: null,
     schedulePrecision: "datetime",
     venue: `Venue name, ${cityName}`,
     ticketTiers: createTicketTiers(id, 5000),
@@ -85,6 +87,7 @@ function fromRecord(event: EventRecord): EventDraft {
     host: event.host,
     category: event.category,
     startsAt: event.startsAt,
+    salesEndAt: event.salesEndAt,
     schedulePrecision: event.schedulePrecision,
     venue: event.venue,
     ticketTiers: event.ticketTiers.map((tier) => ({ ...tier })),
@@ -148,6 +151,7 @@ export default function AdminEventsPage() {
         host: draft.host,
         category: draft.category,
         startsAt: draft.startsAt,
+        salesEndAt: draft.salesEndAt,
         schedulePrecision: draft.schedulePrecision,
         venue: draft.venue,
         area: "",
@@ -177,15 +181,7 @@ export default function AdminEventsPage() {
   }
 
   if (eventsQuery.isLoading || settingsQuery.isLoading) {
-    return (
-      <div className="space-y-6">
-        <Skeleton className="h-10 w-64" />
-        <div className="grid gap-5 xl:grid-cols-[.8fr_1.2fr]">
-          <Skeleton className="h-[420px] w-full" />
-          <Skeleton className="h-[420px] w-full" />
-        </div>
-      </div>
-    );
+    return <AdminPageLoading rows={2} />;
   }
 
   return (
@@ -311,6 +307,14 @@ export default function AdminEventsPage() {
                     <div className="grid content-end gap-1 text-[10px] text-muted-foreground"><p className="font-semibold text-foreground">Date display</p><p>Shows as TBD on the homepage editions list.</p></div>
                   )}
                   <label className="grid gap-1 text-[10px] font-semibold">Status<select className="h-10 border-2 border-input bg-card px-2 text-xs" value={draft.status} onChange={(event) => updateDraft("status", event.target.value as "draft" | "published")}><option value="published">Published</option><option value="draft">Draft</option></select></label>
+                  <label className="grid gap-1 text-[10px] font-semibold sm:col-span-2">Payment deadline
+                    <Input
+                      type="datetime-local"
+                      value={toLocalInputValue(draft.salesEndAt)}
+                      onChange={(event) => updateDraft("salesEndAt", event.target.value ? new Date(event.target.value).toISOString() : null)}
+                    />
+                    <span className="text-[9px] font-normal text-muted-foreground">After this time, Get tickets / checkout is hidden. Leave blank to keep sales open until the event.</span>
+                  </label>
                   <div className="sm:col-span-2">
                     <Button
                       type="button"

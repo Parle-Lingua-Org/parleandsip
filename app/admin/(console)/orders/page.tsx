@@ -2,13 +2,21 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Download, RefreshCw, Search, Ticket, UsersRound } from "lucide-react";
+import { Download, ExternalLink, RefreshCw, Search, Ticket, UsersRound } from "lucide-react";
+import { AdminPageLoading } from "@/components/admin/page-loading";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { queryKeys } from "@/lib/query-keys";
 import { formatNaira } from "@/lib/site-data";
+
+type AdminOrderTicket = {
+  code: string;
+  number: number;
+  name: string;
+  status: string;
+};
 
 type AdminOrder = {
   id: string;
@@ -24,6 +32,7 @@ type AdminOrder = {
   createdAt: string;
   paidAt: string | null;
   expiresAt?: string | null;
+  tickets?: AdminOrderTicket[];
 };
 
 function csvCell(value: string | number) {
@@ -40,7 +49,8 @@ export default function AdminOrdersPage() {
   const queryClient = useQueryClient();
   const [query, setQuery] = useState("");
   const [orders, setOrders] = useState<AdminOrder[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
   const [actionBusyId, setActionBusyId] = useState<string | null>(null);
   const [actionMessage, setActionMessage] = useState("");
@@ -52,11 +62,13 @@ export default function AdminOrdersPage() {
     ]);
   }, [queryClient]);
 
-  const loadOrders = useCallback(async (expireStale = false) => {
-    setLoading(true);
+  const loadOrders = useCallback(async (options?: { expireStale?: boolean; silent?: boolean }) => {
+    const silent = Boolean(options?.silent);
+    if (silent) setRefreshing(true);
+    else setInitialLoading(true);
     setError("");
     try {
-      if (expireStale) {
+      if (options?.expireStale) {
         await fetch("/api/admin/orders/actions", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -74,12 +86,13 @@ export default function AdminOrdersPage() {
     } catch {
       setError("Unable to load ticket orders.");
     } finally {
-      setLoading(false);
+      if (silent) setRefreshing(false);
+      else setInitialLoading(false);
     }
   }, [refreshAvailability]);
 
   useEffect(() => {
-    void loadOrders(true);
+    void loadOrders({ expireStale: true });
   }, [loadOrders]);
 
   const visibleOrders = useMemo(() => {
@@ -104,7 +117,7 @@ export default function AdminOrdersPage() {
       const result = await response.json() as { error?: string; message?: string; status?: string; inventoryReleased?: boolean };
       if (!response.ok) throw new Error(result.error || "Unable to update order.");
       setActionMessage(result.message || `Order is now ${result.status}.`);
-      await loadOrders(false);
+      await loadOrders({ silent: true });
       await refreshAvailability();
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Unable to update order.");
@@ -114,8 +127,21 @@ export default function AdminOrdersPage() {
   }
 
   function exportCsv() {
-    const headers = ["Reference", "Buyer", "Email", "Event", "Tickets", "Quantity", "Total NGN", "Status", "Email", "Created at", "Paid at"];
-    const rows = visibleOrders.map((order) => [order.reference, order.buyerName, order.buyerEmail, order.eventTitle, order.ticketSummary, order.quantity, order.total, order.status, order.emailStatus, order.createdAt, order.paidAt ?? ""]);
+    const headers = ["Reference", "Buyer", "Email", "Event", "Tickets", "Quantity", "Total NGN", "Status", "Email", "Created at", "Paid at", "Ticket codes"];
+    const rows = visibleOrders.map((order) => [
+      order.reference,
+      order.buyerName,
+      order.buyerEmail,
+      order.eventTitle,
+      order.ticketSummary,
+      order.quantity,
+      order.total,
+      order.status,
+      order.emailStatus,
+      order.createdAt,
+      order.paidAt ?? "",
+      (order.tickets ?? []).map((ticket) => ticket.code).join(" "),
+    ]);
     const blob = new Blob([[headers, ...rows].map((row) => row.map(csvCell).join(",")).join("\n")], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
@@ -125,6 +151,10 @@ export default function AdminOrdersPage() {
     URL.revokeObjectURL(url);
   }
 
+  if (initialLoading) {
+    return <AdminPageLoading rows={2} />;
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-4">
@@ -132,14 +162,14 @@ export default function AdminOrdersPage() {
           <p className="font-mono text-[9px] tracking-wide text-muted-foreground">TICKET ORDERS</p>
           <h1 className="mt-1 text-3xl font-bold tracking-tight">Orders</h1>
           <p className="mt-2 text-xs text-muted-foreground">
-            Check Paystack for pending payments, cancel failed reservations, and release ticket capacity.
+            Check Paystack for pending payments, cancel failed reservations, and open issued tickets.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button variant="outline" onClick={() => void loadOrders(true)} disabled={loading}>
-            <RefreshCw size={14} /> Refresh &amp; expire stale
+          <Button variant="outline" onClick={() => void loadOrders({ expireStale: true, silent: true })} disabled={refreshing || actionBusyId !== null}>
+            <RefreshCw size={14} className={refreshing ? "animate-spin" : undefined} /> {refreshing ? "Refreshing…" : "Refresh & expire stale"}
           </Button>
-          <Button variant="outline" disabled={!visibleOrders.length} onClick={exportCsv}><Download size={14} /> Export CSV</Button>
+          <Button variant="outline" disabled={!visibleOrders.length || refreshing} onClick={exportCsv}><Download size={14} /> Export CSV</Button>
         </div>
       </div>
 
@@ -161,7 +191,7 @@ export default function AdminOrdersPage() {
           <div>
             <h2 className="font-bold">Order list</h2>
             <p className="mt-1 text-[10px] text-muted-foreground">
-              Pending holds reduce availability. Verify payment or cancel to release seats. Stale pending holds auto-expire after 15 minutes.
+              Pending holds reduce availability. Verify payment or cancel to release seats. Paid orders open their ticket passes.
             </p>
           </div>
           <label className="flex h-9 w-full items-center gap-2 border-2 border-foreground bg-card px-2.5 sm:max-w-64">
@@ -169,7 +199,7 @@ export default function AdminOrdersPage() {
             <Input className="h-8 border-0 px-0 shadow-none focus-visible:ring-0" placeholder="Search buyers, events, or reference" value={query} onChange={(event) => setQuery(event.target.value)} />
           </label>
         </div>
-        {loading ? <p className="grid min-h-64 place-items-center font-mono text-xs text-muted-foreground">Loading orders…</p> : visibleOrders.length ? (
+        {visibleOrders.length ? (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[1100px] text-left">
               <thead className="bg-secondary font-mono text-[8px] tracking-wide">
@@ -185,57 +215,73 @@ export default function AdminOrdersPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-dap-border-muted">
-                {visibleOrders.map((order) => (
-                  <tr key={order.id} className="text-[10px]">
-                    <td className="px-4 py-3"><strong className="block">{order.buyerName}</strong><span className="mt-1 block text-muted-foreground">{order.buyerEmail}</span><span className="mt-1 block font-mono text-[8px] text-muted-foreground">{order.reference}</span></td>
-                    <td className="px-4 py-3">{order.eventTitle}</td>
-                    <td className="px-4 py-3">{order.ticketSummary}</td>
-                    <td className="px-4 py-3">{order.quantity}</td>
-                    <td className="px-4 py-3 font-semibold">{formatNaira(order.total)}</td>
-                    <td className="px-4 py-3">
-                      <Badge variant={statusVariant(order.status)}>{order.status}</Badge>
-                      {order.status === "paid" ? <span className="mt-1 block text-muted-foreground">Email {order.emailStatus}</span> : null}
-                      {order.status === "pending" && order.expiresAt ? (
-                        <span className="mt-1 block text-muted-foreground">Hold until {new Date(order.expiresAt).toLocaleTimeString("en-NG")}</span>
-                      ) : null}
-                    </td>
-                    <td className="px-4 py-3 text-muted-foreground">{new Date(order.paidAt ?? order.createdAt).toLocaleString("en-NG")}</td>
-                    <td className="px-4 py-3">
-                      {order.status === "pending" || order.status === "expired" || order.status === "cancelled" ? (
+                {visibleOrders.map((order) => {
+                  const paidTickets = order.status === "paid" ? (order.tickets ?? []) : [];
+                  return (
+                    <tr key={order.id} className="text-[10px]">
+                      <td className="px-4 py-3"><strong className="block">{order.buyerName}</strong><span className="mt-1 block text-muted-foreground">{order.buyerEmail}</span><span className="mt-1 block font-mono text-[8px] text-muted-foreground">{order.reference}</span></td>
+                      <td className="px-4 py-3">{order.eventTitle}</td>
+                      <td className="px-4 py-3">{order.ticketSummary}</td>
+                      <td className="px-4 py-3">{order.quantity}</td>
+                      <td className="px-4 py-3 font-semibold">{formatNaira(order.total)}</td>
+                      <td className="px-4 py-3">
+                        <Badge variant={statusVariant(order.status)}>{order.status}</Badge>
+                        {order.status === "paid" ? <span className="mt-1 block text-muted-foreground">Email {order.emailStatus}</span> : null}
+                        {order.status === "pending" && order.expiresAt ? (
+                          <span className="mt-1 block text-muted-foreground">Hold until {new Date(order.expiresAt).toLocaleTimeString("en-NG")}</span>
+                        ) : null}
+                      </td>
+                      <td className="px-4 py-3 text-muted-foreground">{new Date(order.paidAt ?? order.createdAt).toLocaleString("en-NG")}</td>
+                      <td className="px-4 py-3">
                         <div className="flex flex-col gap-1.5">
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            disabled={actionBusyId === order.id}
-                            onClick={() => void runAction(order.id, "verify")}
-                          >
-                            {actionBusyId === order.id ? "Checking…" : "Check Paystack"}
-                          </Button>
-                          {order.status === "pending" ? (
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="ghost"
-                              disabled={actionBusyId === order.id}
-                              onClick={() => {
-                                if (window.confirm("Cancel this pending order and release the held tickets?")) {
-                                  void runAction(order.id, "cancel");
-                                }
-                              }}
-                            >
-                              Cancel &amp; release
+                          {paidTickets.length ? paidTickets.map((ticket) => (
+                            <Button key={ticket.code} asChild size="sm" variant="outline">
+                              <a href={`/ticket/${encodeURIComponent(ticket.code)}`} target="_blank" rel="noreferrer">
+                                <Ticket size={13} /> Ticket {ticket.number} <ExternalLink size={12} />
+                              </a>
                             </Button>
-                          ) : (
-                            <span className="text-[9px] text-muted-foreground">Seats already released</span>
-                          )}
+                          )) : null}
+                          {order.status === "pending" || order.status === "expired" || order.status === "cancelled" ? (
+                            <>
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                disabled={actionBusyId === order.id}
+                                onClick={() => void runAction(order.id, "verify")}
+                              >
+                                {actionBusyId === order.id ? "Checking…" : "Check Paystack"}
+                              </Button>
+                              {order.status === "pending" ? (
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="ghost"
+                                  disabled={actionBusyId === order.id}
+                                  onClick={() => {
+                                    if (window.confirm("Cancel this pending order and release the held tickets?")) {
+                                      void runAction(order.id, "cancel");
+                                    }
+                                  }}
+                                >
+                                  Cancel &amp; release
+                                </Button>
+                              ) : (
+                                <span className="text-[9px] text-muted-foreground">Seats already released</span>
+                              )}
+                            </>
+                          ) : null}
+                          {!paidTickets.length && order.status === "paid" ? (
+                            <span className="text-[9px] text-muted-foreground">No ticket codes yet</span>
+                          ) : null}
+                          {order.status !== "pending" && order.status !== "expired" && order.status !== "cancelled" && order.status !== "paid" ? (
+                            <span className="text-muted-foreground">—</span>
+                          ) : null}
                         </div>
-                      ) : (
-                        <span className="text-muted-foreground">—</span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

@@ -2,10 +2,10 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight, ClipboardList, RefreshCw } from "lucide-react";
+import { AdminPageLoading } from "@/components/admin/page-loading";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
 import type { CommunityRsvpRecord } from "@/lib/community-rsvp";
 
 const PAGE_SIZE = 10;
@@ -58,17 +58,14 @@ export default function AdminRsvpsPage() {
           <p className="mt-2 text-xs text-muted-foreground">Responses from the public RSVP form.</p>
         </div>
         <Button type="button" variant="outline" onClick={() => void load()} disabled={loading}>
-          <RefreshCw size={14} /> Refresh
+          <RefreshCw size={14} className={loading ? "animate-spin" : undefined} /> {loading ? "Loading…" : "Refresh"}
         </Button>
       </div>
 
       {error ? <p role="alert" className="border-2 border-primary bg-card px-3 py-2 text-xs text-primary">{error}</p> : null}
 
       {loading ? (
-        <div className="grid gap-5 xl:grid-cols-[.9fr_1.1fr]">
-          <Skeleton className="h-[420px] w-full" />
-          <Skeleton className="h-[420px] w-full" />
-        </div>
+        <AdminPageLoading rows={2} />
       ) : (
         <div className="grid items-start gap-5 xl:grid-cols-[minmax(300px,.9fr)_minmax(0,1.1fr)]">
           <Card className="overflow-hidden shadow-[4px_4px_0_var(--foreground)]">

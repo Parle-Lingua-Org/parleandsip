@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type FormEvent } from "react";
 import { Check, RefreshCw, Save, Ticket } from "lucide-react";
+import { AdminPageLoading } from "@/components/admin/page-loading";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -157,7 +158,7 @@ export default function AdminTicketsPage() {
   }
 
   if (loading) {
-    return <p className="font-mono text-xs text-muted-foreground">Loading ticket template…</p>;
+    return <AdminPageLoading rows={2} />;
   }
 
   return (

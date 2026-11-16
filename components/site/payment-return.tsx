@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { Ticket } from "lucide-react";
+import { LoaderCircle, Ticket } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 
 type View = "checking" | "paid" | "pending" | "error";
 
@@ -63,14 +64,22 @@ export function PaymentReturn() {
   return (
     <main className="grid min-h-screen place-items-center bg-background px-4 text-foreground">
       <section className="w-full max-w-md border-2 border-foreground bg-card p-6 text-center shadow-[4px_4px_0_var(--foreground)]">
-        <span className="mx-auto grid size-11 place-items-center border-2 border-foreground bg-primary"><Ticket size={20} /></span>
+        <span className="mx-auto grid size-11 place-items-center border-2 border-foreground bg-primary">
+          {view === "checking" ? <LoaderCircle size={20} className="animate-spin" /> : <Ticket size={20} />}
+        </span>
         <p className="mt-4 font-mono text-[9px] tracking-wide text-muted-foreground">PAYSTACK</p>
         <h1 className="mt-1 text-2xl font-bold">{title}</h1>
         <p className="mt-2 text-xs leading-5 text-muted-foreground">{message}</p>
+        {view === "checking" ? (
+          <div className="mt-4 space-y-2" role="status" aria-label="Confirming payment">
+            <Skeleton className="mx-auto h-3 w-48" />
+            <Skeleton className="mx-auto h-3 w-36" />
+          </div>
+        ) : null}
         {view === "paid" && <p className="mt-3 text-xs font-semibold">{ticketCount} ticket{ticketCount === 1 ? "" : "s"} issued · {reference}</p>}
         <div className="mt-5 flex flex-col items-center gap-3">
           {(view === "pending" || view === "error") && reference ? <Button variant="outline" onClick={() => window.location.reload()}>Check again</Button> : null}
-          <Button asChild variant="outline"><a href="/">Back to experiences</a></Button>
+          {view !== "checking" ? <Button asChild variant="outline"><a href="/">Back to experiences</a></Button> : null}
         </div>
       </section>
     </main>

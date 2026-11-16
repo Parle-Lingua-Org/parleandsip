@@ -30,6 +30,7 @@ export type DbTierRow = {
   price_ngn: number | string;
   capacity: number | null;
   quantity_sold: number | null;
+  sales_end_at?: string | null;
   is_active: boolean | null;
   sort_order: number | null;
 };
@@ -43,6 +44,7 @@ export type DbImageRow = {
 export type EventRecord = EventItem & {
   slug: string;
   startsAt: string | null;
+  salesEndAt: string | null;
   status: EventStatus;
   summary: string;
   schedulePrecision: SchedulePrecision;
@@ -59,6 +61,7 @@ export type EventSaveInput = {
   host: string;
   category: string;
   startsAt: string | null;
+  salesEndAt?: string | null;
   schedulePrecision?: SchedulePrecision;
   venue: string;
   area: string;
@@ -164,17 +167,23 @@ export function slugify(value: string) {
 export function mapDbEvent(row: DbEventRow): EventRecord {
   const schedulePrecision = row.schedule_precision ?? (row.starts_at ? "datetime" : "tbd");
   const parts = formatParts(row.starts_at, schedulePrecision);
-  const tiers = (row.ticket_tiers ?? [])
+  const activeTiers = (row.ticket_tiers ?? [])
     .filter((tier) => tier.is_active !== false)
-    .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
-    .map((tier): TicketTier => ({
-      id: tier.id,
-      name: tier.name,
-      description: tier.description || "",
-      price: Number(tier.price_ngn) || 0,
-      capacity: Number(tier.capacity ?? 0) || 0,
-      quantitySold: Number(tier.quantity_sold ?? 0) || 0,
-    }));
+    .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
+  const tiers = activeTiers.map((tier): TicketTier => ({
+    id: tier.id,
+    name: tier.name,
+    description: tier.description || "",
+    price: Number(tier.price_ngn) || 0,
+    capacity: Number(tier.capacity ?? 0) || 0,
+    quantitySold: Number(tier.quantity_sold ?? 0) || 0,
+  }));
+  const salesEnds = activeTiers
+    .map((tier) => tier.sales_end_at)
+    .filter((value): value is string => Boolean(value));
+  const salesEndAt = salesEnds.length
+    ? salesEnds.reduce((earliest, value) => (new Date(value).getTime() < new Date(earliest).getTime() ? value : earliest))
+    : null;
   const gallery = (row.event_images ?? [])
     .slice()
     .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
@@ -188,6 +197,7 @@ export function mapDbEvent(row: DbEventRow): EventRecord {
     host: row.host_name || "Parle & Sip",
     category: row.category,
     startsAt: row.starts_at,
+    salesEndAt,
     status: row.status,
     summary: row.summary || "",
     schedulePrecision,
@@ -209,6 +219,13 @@ export function mapDbEvent(row: DbEventRow): EventRecord {
 
 export function remainingForTier(tier: TicketTier) {
   return Math.max(0, (tier.capacity || 0) - (tier.quantitySold || 0));
+}
+
+export function isEventSalesOpen(event: Pick<EventRecord, "salesEndAt">, now = Date.now()) {
+  if (!event.salesEndAt) return true;
+  const ends = new Date(event.salesEndAt).getTime();
+  if (Number.isNaN(ends)) return true;
+  return ends > now;
 }
 
 export function upcomingEvents(events: EventRecord[], limit = 3) {

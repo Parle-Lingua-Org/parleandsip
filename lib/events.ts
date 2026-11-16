@@ -8,14 +8,14 @@ export type { EventSaveInput } from "@/lib/events-shared";
 const eventSelectBase = `
   id, slug, title, summary, host_name, category, starts_at, venue_name, address, area,
   language_tags, main_image_url, listing_label, status,
-  ticket_tiers (id, name, description, price_ngn, capacity, quantity_sold, is_active, sort_order),
+  ticket_tiers (id, name, description, price_ngn, capacity, quantity_sold, sales_end_at, is_active, sort_order),
   event_images (id, image_url, sort_order)
 `;
 
 const eventSelect = `
   id, slug, title, summary, host_name, category, starts_at, schedule_precision, venue_name, address, area,
   language_tags, main_image_url, listing_label, status,
-  ticket_tiers (id, name, description, price_ngn, capacity, quantity_sold, is_active, sort_order),
+  ticket_tiers (id, name, description, price_ngn, capacity, quantity_sold, sales_end_at, is_active, sort_order),
   event_images (id, image_url, sort_order)
 `;
 
@@ -136,6 +136,13 @@ export async function saveEvent(input: EventSaveInput, createdBy?: string | null
   if (tiersReadError) throw new Error(tiersReadError.message);
   const keepIds = new Set(input.ticketTiers.map((tier) => tier.id).filter(Boolean) as string[]);
 
+  let salesEndAtIso: string | null = null;
+  if (input.salesEndAt) {
+    const salesEnd = new Date(input.salesEndAt);
+    if (Number.isNaN(salesEnd.getTime())) throw new Error("Choose a valid payment deadline.");
+    salesEndAtIso = salesEnd.toISOString();
+  }
+
   for (const [index, tier] of input.ticketTiers.entries()) {
     const tierPayload = {
       event_id: eventId,
@@ -143,6 +150,7 @@ export async function saveEvent(input: EventSaveInput, createdBy?: string | null
       description: tier.description.trim(),
       price_ngn: Math.max(0, Number(tier.price) || 0),
       capacity: Math.max(0, Number(tier.capacity) || 0),
+      sales_end_at: salesEndAtIso,
       is_active: true,
       sort_order: index,
       updated_at: new Date().toISOString(),
