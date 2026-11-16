@@ -12,6 +12,7 @@ type OrderRow = {
   subtotal_ngn: number | string;
   created_at: string;
   paid_at: string | null;
+  expires_at: string | null;
   email_status: string;
   events: EventRelation;
   ticket_order_items: OrderItem[] | null;
@@ -33,7 +34,7 @@ export async function GET() {
   const admin = createAdminClient();
   const { data, error: ordersError } = await admin
     .from("ticket_orders")
-    .select("id, public_reference, buyer_name, buyer_email, status, subtotal_ngn, created_at, paid_at, email_status, events(title), ticket_order_items(ticket_name, quantity)")
+    .select("id, public_reference, buyer_name, buyer_email, status, subtotal_ngn, created_at, paid_at, expires_at, email_status, events(title), ticket_order_items(ticket_name, quantity)")
     .order("created_at", { ascending: false });
   if (ordersError) return Response.json({ error: ordersError.message }, { status: 500 });
 
@@ -52,6 +53,7 @@ export async function GET() {
       emailStatus: order.email_status,
       createdAt: order.created_at,
       paidAt: order.paid_at,
+      expiresAt: order.expires_at,
     };
   });
 
