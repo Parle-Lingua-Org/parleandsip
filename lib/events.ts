@@ -140,10 +140,14 @@ export async function saveEvent(input: EventSaveInput, createdBy?: string | null
 
   const { data: existingTiers, error: tiersReadError } = await admin
     .from("ticket_tiers")
-    .select("id")
+    .select("id, name")
     .eq("event_id", eventId);
   if (tiersReadError) throw new Error(tiersReadError.message);
-  const keepIds = new Set(input.ticketTiers.map((tier) => tier.id).filter(Boolean) as string[]);
+  const existingById = new Map((existingTiers ?? []).map((tier) => [tier.id as string, tier]));
+  const existingByName = new Map(
+    (existingTiers ?? []).map((tier) => [(tier.name as string).trim().toLowerCase(), tier.id as string]),
+  );
+  const keptExistingIds = new Set<string>();
 
   let salesEndAtIso: string | null = null;
   if (input.salesEndAt) {
@@ -153,9 +157,11 @@ export async function saveEvent(input: EventSaveInput, createdBy?: string | null
   }
 
   for (const [index, tier] of input.ticketTiers.entries()) {
+    const name = tier.name.trim();
+    if (!name) throw new Error("Each ticket type needs a name.");
     const tierPayload = {
       event_id: eventId,
-      name: tier.name.trim(),
+      name,
       description: tier.description.trim(),
       price_ngn: Math.max(0, Number(tier.price) || 0),
       capacity: Math.max(0, Number(tier.capacity) || 0),
@@ -164,20 +170,36 @@ export async function saveEvent(input: EventSaveInput, createdBy?: string | null
       sort_order: index,
       updated_at: new Date().toISOString(),
     };
-    if (tier.id && keepIds.has(tier.id)) {
-      const { error } = await admin.from("ticket_tiers").update(tierPayload).eq("id", tier.id).eq("event_id", eventId);
+
+    // New tiers get a browser UUID that is not in the DB yet — only update real rows.
+    const nameMatch = existingByName.get(name.toLowerCase());
+    const existingId = (tier.id && existingById.has(tier.id) ? tier.id : null)
+      || (nameMatch && !keptExistingIds.has(nameMatch) ? nameMatch : null)
+      || null;
+
+    if (existingId) {
+      const { error } = await admin
+        .from("ticket_tiers")
+        .update(tierPayload)
+        .eq("id", existingId)
+        .eq("event_id", eventId);
       if (error) throw new Error(error.message);
+      keptExistingIds.add(existingId);
     } else {
-      const { error } = await admin.from("ticket_tiers").insert(tierPayload);
+      const insertPayload = tier.id ? { id: tier.id, ...tierPayload } : tierPayload;
+      const { data: inserted, error } = await admin
+        .from("ticket_tiers")
+        .insert(insertPayload)
+        .select("id")
+        .single();
       if (error) throw new Error(error.message);
+      if (inserted?.id) keptExistingIds.add(inserted.id as string);
     }
   }
 
-  const removedTier = (existingTiers ?? [])
-    .map((tier) => tier.id as string)
-    .filter((id) => !keepIds.has(id));
-  if (removedTier.length) {
-    const { error } = await admin.from("ticket_tiers").update({ is_active: false }).in("id", removedTier);
+  const removedTiers = [...existingById.keys()].filter((id) => !keptExistingIds.has(id));
+  if (removedTiers.length) {
+    const { error } = await admin.from("ticket_tiers").update({ is_active: false }).in("id", removedTiers);
     if (error) throw new Error(error.message);
   }
 
