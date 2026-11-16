@@ -87,6 +87,16 @@ export function PublicHome() {
     setOrderComplete(false);
     setOrderError("");
     setCheckoutUrl("");
+    void eventsQuery.refetch().then((result) => {
+      const fresh = result.data?.find((item) => item.id === event.id);
+      if (!fresh) return;
+      setSelectedEvent((current) => (current?.id === fresh.id ? fresh : current));
+      setSelectedTierId((current) => {
+        const stillValid = fresh.ticketTiers.some((tier) => tier.id === current && remainingForTier(tier) > 0);
+        if (stillValid) return current;
+        return fresh.ticketTiers.find((tier) => remainingForTier(tier) > 0)?.id ?? fresh.ticketTiers[0]?.id ?? "";
+      });
+    });
   }
 
   async function submitCheckout(event: React.FormEvent<HTMLFormElement>) {

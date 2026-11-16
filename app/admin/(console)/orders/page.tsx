@@ -1,11 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Download, RefreshCw, Search, Ticket, UsersRound } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { queryKeys } from "@/lib/query-keys";
 import { formatNaira } from "@/lib/site-data";
 
 type AdminOrder = {
@@ -35,12 +37,20 @@ function statusVariant(status: string) {
 }
 
 export default function AdminOrdersPage() {
+  const queryClient = useQueryClient();
   const [query, setQuery] = useState("");
   const [orders, setOrders] = useState<AdminOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [actionBusyId, setActionBusyId] = useState<string | null>(null);
   const [actionMessage, setActionMessage] = useState("");
+
+  const refreshAvailability = useCallback(async () => {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: queryKeys.publishedEvents }),
+      queryClient.invalidateQueries({ queryKey: queryKeys.adminEvents }),
+    ]);
+  }, [queryClient]);
 
   const loadOrders = useCallback(async (expireStale = false) => {
     setLoading(true);
@@ -52,6 +62,7 @@ export default function AdminOrdersPage() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ action: "expire_stale" }),
         });
+        await refreshAvailability();
       }
       const response = await fetch("/api/admin/orders", { cache: "no-store" });
       const result = await response.json() as { orders?: AdminOrder[]; error?: string };
@@ -65,7 +76,7 @@ export default function AdminOrdersPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [refreshAvailability]);
 
   useEffect(() => {
     void loadOrders(true);
@@ -94,6 +105,7 @@ export default function AdminOrdersPage() {
       if (!response.ok) throw new Error(result.error || "Unable to update order.");
       setActionMessage(result.message || `Order is now ${result.status}.`);
       await loadOrders(false);
+      await refreshAvailability();
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Unable to update order.");
     } finally {
@@ -189,7 +201,7 @@ export default function AdminOrdersPage() {
                     </td>
                     <td className="px-4 py-3 text-muted-foreground">{new Date(order.paidAt ?? order.createdAt).toLocaleString("en-NG")}</td>
                     <td className="px-4 py-3">
-                      {order.status === "pending" ? (
+                      {order.status === "pending" || order.status === "expired" || order.status === "cancelled" ? (
                         <div className="flex flex-col gap-1.5">
                           <Button
                             type="button"
@@ -200,19 +212,23 @@ export default function AdminOrdersPage() {
                           >
                             {actionBusyId === order.id ? "Checking…" : "Check Paystack"}
                           </Button>
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="ghost"
-                            disabled={actionBusyId === order.id}
-                            onClick={() => {
-                              if (window.confirm("Cancel this pending order and release the held tickets?")) {
-                                void runAction(order.id, "cancel");
-                              }
-                            }}
-                          >
-                            Cancel &amp; release
-                          </Button>
+                          {order.status === "pending" ? (
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="ghost"
+                              disabled={actionBusyId === order.id}
+                              onClick={() => {
+                                if (window.confirm("Cancel this pending order and release the held tickets?")) {
+                                  void runAction(order.id, "cancel");
+                                }
+                              }}
+                            >
+                              Cancel &amp; release
+                            </Button>
+                          ) : (
+                            <span className="text-[9px] text-muted-foreground">Seats already released</span>
+                          )}
                         </div>
                       ) : (
                         <span className="text-muted-foreground">—</span>

@@ -206,18 +206,18 @@ export default function AdminEventsPage() {
       )}
 
       <Card className="p-4 shadow-[4px_4px_0_var(--foreground)] sm:p-5">
-        <div className="flex flex-wrap items-end justify-between gap-4">
-          <div>
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,22rem)] lg:items-end">
+          <div className="min-w-0">
             <p className="font-mono text-[9px] tracking-wide text-muted-foreground">HOMEPAGE · FEATURED CARD</p>
             <h2 className="mt-1 text-lg font-bold">This week&apos;s pick</h2>
             <p className="mt-1 max-w-xl text-[10px] text-muted-foreground">
               Chooses the large “THIS WEEK&apos;S PICK” card on the public homepage. Leave blank to auto-use the next upcoming event.
             </p>
           </div>
-          <label className="grid min-w-[240px] flex-1 gap-1 text-[10px] font-semibold sm:max-w-sm">
+          <label className="grid w-full min-w-0 gap-1 text-[10px] font-semibold">
             Featured experience
             <select
-              className="h-10 border-2 border-input bg-card px-2 text-xs"
+              className="h-10 w-full min-w-0 max-w-full border-2 border-input bg-card px-2 text-xs"
               value={featuredSlug}
               disabled={pickBusy || saveSettingsMutation.isPending || !events.length}
               onChange={(event) => {

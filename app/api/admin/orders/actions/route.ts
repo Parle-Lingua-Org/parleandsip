@@ -67,8 +67,8 @@ export async function POST(request: Request) {
       if (order.status === "paid") {
         return Response.json({ ok: true, status: "paid", message: "Order is already paid." });
       }
-      if (order.status !== "pending") {
-        return Response.json({ error: `Only pending orders can be verified. Current status: ${order.status}.` }, { status: 409 });
+      if (!["pending", "expired", "cancelled"].includes(order.status)) {
+        return Response.json({ error: `Cannot verify a ${order.status} order.` }, { status: 409 });
       }
 
       const reference = (order.payment_reference || order.public_reference || "").trim();
@@ -80,37 +80,49 @@ export async function POST(request: Request) {
         return Response.json({
           ok: true,
           status: "paid",
-          message: "Payment confirmed on Paystack. Tickets issued.",
+          message: order.status === "pending"
+            ? "Payment confirmed on Paystack. Tickets issued."
+            : "Late Paystack payment found. Order marked paid and tickets issued.",
           emailStatus: fulfilled.emailStatus,
         });
       }
 
       const paystackStatus = charge.status.toLowerCase();
       const failedLike = ["failed", "abandoned", "reversed", "cancelled"].includes(paystackStatus);
-      if (failedLike || new Date(order.expires_at).getTime() <= Date.now()) {
-        const nextStatus = failedLike ? "cancelled" : "expired";
-        const { error } = await admin
-          .from("ticket_orders")
-          .update({ status: nextStatus, updated_at: new Date().toISOString() })
-          .eq("id", order.id)
-          .eq("status", "pending");
-        if (error) throw new Error(error.message);
+
+      if (order.status === "pending") {
+        if (failedLike || new Date(order.expires_at).getTime() <= Date.now()) {
+          const nextStatus = failedLike ? "cancelled" : "expired";
+          const { error } = await admin
+            .from("ticket_orders")
+            .update({ status: nextStatus, updated_at: new Date().toISOString() })
+            .eq("id", order.id)
+            .eq("status", "pending");
+          if (error) throw new Error(error.message);
+          return Response.json({
+            ok: true,
+            status: nextStatus,
+            paystackStatus,
+            inventoryReleased: true,
+            message: failedLike
+              ? `Paystack reports ${paystackStatus}. Order cancelled and tickets released.`
+              : "Payment still unpaid and reservation expired. Tickets released.",
+          });
+        }
+
         return Response.json({
           ok: true,
-          status: nextStatus,
+          status: "pending",
           paystackStatus,
-          inventoryReleased: true,
-          message: failedLike
-            ? `Paystack reports ${paystackStatus}. Order cancelled and tickets released.`
-            : "Payment still unpaid and reservation expired. Tickets released.",
+          message: `Paystack still shows ${paystackStatus}. Leave as pending or cancel to release tickets.`,
         });
       }
 
       return Response.json({
         ok: true,
-        status: "pending",
+        status: order.status,
         paystackStatus,
-        message: `Paystack still shows ${paystackStatus}. Leave as pending or cancel to release tickets.`,
+        message: `No successful Paystack payment. Order stays ${order.status}; seats are already released.`,
       });
     }
 

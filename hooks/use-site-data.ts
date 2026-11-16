@@ -30,6 +30,8 @@ export function usePublishedEventsQuery() {
       const result = await readJson<{ events: EventRecord[] }>(response);
       return result.events;
     },
+    staleTime: 5_000,
+    refetchOnWindowFocus: true,
   });
 }
 
