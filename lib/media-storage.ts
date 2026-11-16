@@ -6,7 +6,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 export const MEDIA_BUCKET = "parle-sip-media";
 
 function parseDataUrl(dataUrl: string) {
-  const match = /^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/s.exec(dataUrl.trim());
+  const match = /^data:(image\/[a-zA-Z0-9.+-]+);base64,([\s\S]+)$/.exec(dataUrl.trim());
   if (!match) throw new Error("Invalid image data.");
   const contentType = match[1].toLowerCase();
   const base64 = match[2];

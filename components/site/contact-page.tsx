@@ -74,7 +74,6 @@ export function ContactPage() {
                 onSubmit={async (event) => {
                   event.preventDefault();
                   setBusy(true);
-                  setError("");
                   try {
                     const response = await fetch("/api/contact", {
                       method: "POST",
