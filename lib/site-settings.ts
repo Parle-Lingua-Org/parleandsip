@@ -1,6 +1,7 @@
 import "server-only";
 
 import { createAdminClient } from "@/lib/supabase/admin";
+import { ensureStoredImageUrl } from "@/lib/media-storage";
 import { initialSiteData, type FaqItem, type SiteContent, type SiteTheme } from "@/lib/site-data";
 import { defaultTicketTemplate, normalizeTicketTemplate, type TicketTemplate } from "@/lib/ticket-pdf-shared";
 
@@ -95,6 +96,10 @@ export async function saveSiteSettings(
   const admin = createAdminClient();
   const current = await getSiteSettings();
   const nextContent = normalizeSiteContent({ ...current.content, ...input.content });
+  nextContent.heroImage = await ensureStoredImageUrl(nextContent.heroImage || "", "site/hero");
+  nextContent.aboutImage = await ensureStoredImageUrl(nextContent.aboutImage || "", "site/about");
+  nextContent.logoImage = await ensureStoredImageUrl(nextContent.logoImage || "", "site/logo");
+  nextContent.faviconImage = await ensureStoredImageUrl(nextContent.faviconImage || "", "site/favicon");
   const nextTheme = normalizeSiteTheme({ ...current.theme, ...input.theme });
   const nextTemplate = normalizeTicketTemplate(input.ticketTemplate ?? current.ticketTemplate);
 

@@ -11,6 +11,7 @@ import {
   sampleTicketPreview,
   type TicketTemplate,
 } from "@/lib/ticket-pdf-shared";
+import { notifyError, notifySuccess } from "@/lib/notify";
 
 function NumberField({
   label,
@@ -53,7 +54,6 @@ export default function AdminTicketsPage() {
   const [saving, setSaving] = useState(false);
   const [previewing, setPreviewing] = useState(false);
   const [saved, setSaved] = useState(false);
-  const [error, setError] = useState("");
 
   useEffect(() => {
     let active = true;
@@ -66,7 +66,7 @@ export default function AdminTicketsPage() {
         setTemplate(result.template ?? defaultTicketTemplate);
       } catch (reason) {
         if (!active) return;
-        setError(reason instanceof Error ? reason.message : "Unable to load ticket template.");
+        notifyError(reason, "Unable to load ticket template.");
       } finally {
         if (active) setLoading(false);
       }
@@ -94,10 +94,9 @@ export default function AdminTicketsPage() {
           if (current) URL.revokeObjectURL(current);
           return nextUrl;
         });
-        setError("");
       } catch (reason) {
         if (!active) return;
-        setError(reason instanceof Error ? reason.message : "Unable to render ticket preview.");
+        notifyError(reason, "Unable to render ticket preview.");
       } finally {
         if (active) setPreviewing(false);
       }
@@ -123,9 +122,8 @@ export default function AdminTicketsPage() {
         if (current) URL.revokeObjectURL(current);
         return nextUrl;
       });
-      setError("");
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Unable to render ticket preview.");
+      notifyError(reason, "Unable to render ticket preview.");
     } finally {
       setPreviewing(false);
     }
@@ -139,7 +137,6 @@ export default function AdminTicketsPage() {
   async function saveTemplate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setSaving(true);
-    setError("");
     try {
       const response = await fetch("/api/admin/ticket-template", {
         method: "PUT",
@@ -150,8 +147,9 @@ export default function AdminTicketsPage() {
       if (!response.ok) throw new Error(result.error || "Unable to save ticket template.");
       setTemplate(result.template ?? template);
       setSaved(true);
+      notifySuccess("Ticket template saved.");
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Unable to save ticket template.");
+      notifyError(reason, "Unable to save ticket template.");
     } finally {
       setSaving(false);
     }
@@ -179,8 +177,6 @@ export default function AdminTicketsPage() {
           <Button type="submit" disabled={saving}><Save size={14} /> {saving ? "Saving…" : "Save template"}</Button>
         </div>
       </div>
-
-      {error ? <p className="border-2 border-primary bg-card px-3 py-2 text-xs text-primary">{error}</p> : null}
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,420px)_minmax(0,1fr)]">
         <div className="space-y-4">

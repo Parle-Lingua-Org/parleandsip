@@ -1,3 +1,4 @@
+import { clearPinUnlockCookie } from "@/lib/admin-pin";
 import { createClient } from "@/lib/supabase/server";
 
 export async function POST(request: Request) {
@@ -19,5 +20,6 @@ export async function POST(request: Request) {
     return Response.json({ error: "This account does not have administrator access." }, { status: 403 });
   }
 
-  return Response.json({ email: data.user.email });
+  await clearPinUnlockCookie();
+  return Response.json({ email: data.user.email, pinRequired: true });
 }

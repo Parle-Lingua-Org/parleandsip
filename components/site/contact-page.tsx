@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import { SiteChrome } from "@/components/site/site-chrome";
 import { useSiteSettingsQuery } from "@/hooks/use-site-data";
+import { notifyError, notifySuccess } from "@/lib/notify";
 import { initialSiteData } from "@/lib/site-data";
 
 export function ContactPage() {
@@ -18,7 +19,6 @@ export function ContactPage() {
   const [subject, setSubject] = useState("");
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
   const [sent, setSent] = useState(false);
 
   return (
@@ -93,8 +93,9 @@ export function ContactPage() {
                     setEmail("");
                     setSubject("");
                     setMessage("");
+                    notifySuccess("Message sent. We'll get back to you if a reply is needed.");
                   } catch (reason) {
-                    setError(reason instanceof Error ? reason.message : "Unable to send your message.");
+                    notifyError(reason, "Unable to send your message.");
                   } finally {
                     setBusy(false);
                   }
@@ -104,7 +105,6 @@ export function ContactPage() {
                   <p className="font-mono text-[9px] tracking-wide text-muted-foreground">WRITE TO US</p>
                   <h2 className="mt-1 text-xl font-bold">Send a message</h2>
                 </div>
-                {error ? <p role="alert" className="text-xs text-primary">{error}</p> : null}
                 <label className="grid gap-1 text-[10px] font-semibold">Name<Input required value={name} onChange={(event) => setName(event.target.value)} /></label>
                 <label className="grid gap-1 text-[10px] font-semibold">Email<Input type="email" required value={email} onChange={(event) => setEmail(event.target.value)} /></label>
                 <label className="grid gap-1 text-[10px] font-semibold">Subject<Input required value={subject} onChange={(event) => setSubject(event.target.value)} /></label>

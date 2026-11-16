@@ -9,6 +9,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useSiteSettingsQuery } from "@/hooks/use-site-data";
 import { initialSiteData } from "@/lib/site-data";
+import { notifyError } from "@/lib/notify";
 
 export default function AdminLoginPage() {
   const router = useRouter();
@@ -16,12 +17,10 @@ export default function AdminLoginPage() {
   const content = settingsQuery.data?.content ?? initialSiteData.content;
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
   async function signIn(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setError("");
     setBusy(true);
     try {
       const response = await fetch("/api/admin/login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email: email.trim(), password }) });
@@ -29,7 +28,7 @@ export default function AdminLoginPage() {
       if (!response.ok) throw new Error(result.error ?? "Sign-in failed.");
       router.replace("/admin");
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Unable to sign in. Check your Supabase configuration.");
+      notifyError(reason, "Unable to sign in. Check your Supabase configuration.");
     } finally {
       setBusy(false);
     }
@@ -53,7 +52,6 @@ export default function AdminLoginPage() {
             <form className="grid gap-4" onSubmit={signIn}>
               <label className="grid gap-1.5 text-xs font-semibold">Email <Input type="email" autoComplete="username" required value={email} onChange={(event) => setEmail(event.target.value)} /></label>
               <label className="grid gap-1.5 text-xs font-semibold">Password <Input type="password" autoComplete="current-password" required value={password} onChange={(event) => setPassword(event.target.value)} /></label>
-              {error && <p role="alert" className="border-2 border-accent bg-accent/20 p-2 text-xs">{error}</p>}
               <Button type="submit" disabled={busy} className="mt-1 w-full">{busy ? "Signing in…" : "Sign in"} <ArrowRight size={15} /></Button>
             </form>
           </Card>

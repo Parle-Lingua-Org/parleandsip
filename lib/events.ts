@@ -1,6 +1,7 @@
 import "server-only";
 
 import { createAdminClient } from "@/lib/supabase/admin";
+import { ensureStoredImageUrl, ensureStoredImageUrls } from "@/lib/media-storage";
 import { mapDbEvent, slugify, type DbEventRow, type EventRecord, type EventSaveInput } from "@/lib/events-shared";
 
 export type { EventSaveInput } from "@/lib/events-shared";
@@ -85,7 +86,7 @@ export async function saveEvent(input: EventSaveInput, createdBy?: string | null
   const desiredSlug = slugify(input.slug || input.title);
   const slug = await requireUniqueSlug(admin, desiredSlug, input.id);
   const status = input.status ?? "published";
-  const eventPayload = {
+  const eventPayloadBase = {
     slug,
     title: input.title.trim(),
     summary: (input.summary || "").trim(),
@@ -97,7 +98,6 @@ export async function saveEvent(input: EventSaveInput, createdBy?: string | null
     address: input.venue.trim(),
     area: (input.area || "").trim(),
     language_tags: input.languages ?? [],
-    main_image_url: input.image.trim(),
     listing_label: (input.label || "").trim(),
     status,
     updated_at: new Date().toISOString(),
@@ -105,29 +105,38 @@ export async function saveEvent(input: EventSaveInput, createdBy?: string | null
 
   let eventId = input.id;
   if (eventId) {
-    let { error } = await admin.from("events").update(eventPayload).eq("id", eventId);
+    let { error } = await admin.from("events").update({ ...eventPayloadBase, main_image_url: input.image.trim() }).eq("id", eventId);
     if (isMissingSchedulePrecision(error)) {
-      const { schedule_precision: _ignored, ...legacyPayload } = eventPayload;
-      ({ error } = await admin.from("events").update(legacyPayload).eq("id", eventId));
+      const { schedule_precision: _ignored, ...legacyPayload } = eventPayloadBase;
+      ({ error } = await admin.from("events").update({ ...legacyPayload, main_image_url: input.image.trim() }).eq("id", eventId));
     }
     if (error) throw new Error(error.message);
   } else {
     let { data, error } = await admin
       .from("events")
-      .insert({ ...eventPayload, created_by: createdBy ?? null })
+      .insert({ ...eventPayloadBase, main_image_url: "", created_by: createdBy ?? null })
       .select("id")
       .single();
     if (isMissingSchedulePrecision(error)) {
-      const { schedule_precision: _ignored, ...legacyPayload } = eventPayload;
+      const { schedule_precision: _ignored, ...legacyPayload } = eventPayloadBase;
       ({ data, error } = await admin
         .from("events")
-        .insert({ ...legacyPayload, created_by: createdBy ?? null })
+        .insert({ ...legacyPayload, main_image_url: "", created_by: createdBy ?? null })
         .select("id")
         .single());
     }
     if (error || !data) throw new Error(error?.message || "Unable to create event.");
     eventId = data.id;
   }
+
+  const folder = `events/${eventId}`;
+  const mainImageUrl = await ensureStoredImageUrl(input.image, folder);
+  const galleryUrls = await ensureStoredImageUrls([mainImageUrl, ...input.gallery], folder);
+  const { error: imageUpdateError } = await admin
+    .from("events")
+    .update({ main_image_url: mainImageUrl, updated_at: new Date().toISOString() })
+    .eq("id", eventId);
+  if (imageUpdateError) throw new Error(imageUpdateError.message);
 
   const { data: existingTiers, error: tiersReadError } = await admin
     .from("ticket_tiers")
@@ -174,10 +183,9 @@ export async function saveEvent(input: EventSaveInput, createdBy?: string | null
 
   const { error: deleteImagesError } = await admin.from("event_images").delete().eq("event_id", eventId);
   if (deleteImagesError) throw new Error(deleteImagesError.message);
-  const gallery = [input.image, ...input.gallery].filter((image, index, list) => Boolean(image.trim()) && list.indexOf(image) === index);
-  if (gallery.length) {
+  if (galleryUrls.length) {
     const { error } = await admin.from("event_images").insert(
-      gallery.map((image_url, sort_order) => ({ event_id: eventId, image_url, sort_order, alt_text: input.title.trim() })),
+      galleryUrls.map((image_url, sort_order) => ({ event_id: eventId, image_url, sort_order, alt_text: input.title.trim() })),
     );
     if (error) throw new Error(error.message);
   }

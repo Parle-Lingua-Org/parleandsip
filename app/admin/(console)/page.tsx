@@ -9,6 +9,7 @@ import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAdminEventsQuery } from "@/hooks/use-site-data";
 import { formatNaira } from "@/lib/site-data";
+import { notifyError } from "@/lib/notify";
 
 type AdminOrder = {
   id: string;
@@ -25,7 +26,6 @@ export default function AdminOverviewPage() {
   const events = eventsQuery.data ?? [];
   const [orders, setOrders] = useState<AdminOrder[]>([]);
   const [ordersLoading, setOrdersLoading] = useState(true);
-  const [ordersError, setOrdersError] = useState("");
 
   useEffect(() => {
     let active = true;
@@ -35,12 +35,12 @@ export default function AdminOverviewPage() {
         const result = await response.json() as { orders?: AdminOrder[]; error?: string };
         if (!active) return;
         if (!response.ok) {
-          setOrdersError(result.error ?? "Unable to load ticket orders.");
+          notifyError(result.error ?? "Unable to load ticket orders.");
           return;
         }
         setOrders(result.orders ?? []);
-      } catch {
-        if (active) setOrdersError("Unable to load ticket orders.");
+      } catch (reason) {
+        if (active) notifyError(reason, "Unable to load ticket orders.");
       } finally {
         if (active) setOrdersLoading(false);
       }
@@ -93,8 +93,6 @@ export default function AdminOverviewPage() {
           </div>
           {ordersLoading ? (
             <div className="space-y-3 p-4">{Array.from({ length: 4 }).map((_, index) => <Skeleton key={index} className="h-12 w-full" />)}</div>
-          ) : ordersError ? (
-            <p role="alert" className="grid min-h-40 place-items-center px-5 text-center text-xs">{ordersError}</p>
           ) : paidOrders.length ? (
             <div className="divide-y divide-dap-border-muted">
               {paidOrders.slice(0, 5).map((order) => (

@@ -19,6 +19,7 @@ export function useSiteSettingsQuery() {
       const response = await fetch("/api/site-settings", { cache: "no-store" });
       return readJson<{ content: SiteContent; theme: SiteTheme; ticketTemplate: TicketTemplate }>(response);
     },
+    staleTime: 1000 * 60 * 5,
   });
 }
 
@@ -30,8 +31,7 @@ export function usePublishedEventsQuery() {
       const result = await readJson<{ events: EventRecord[] }>(response);
       return result.events;
     },
-    staleTime: 5_000,
-    refetchOnWindowFocus: true,
+    staleTime: 1000 * 60 * 2,
   });
 }
 
@@ -43,6 +43,7 @@ export function useAdminEventsQuery() {
       const result = await readJson<{ events: EventRecord[] }>(response);
       return result.events;
     },
+    staleTime: 30_000,
   });
 }
 

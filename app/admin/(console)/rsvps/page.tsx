@@ -7,19 +7,18 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import type { CommunityRsvpRecord } from "@/lib/community-rsvp";
+import { notifyError } from "@/lib/notify";
 
 const PAGE_SIZE = 10;
 
 export default function AdminRsvpsPage() {
   const [rsvps, setRsvps] = useState<CommunityRsvpRecord[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [page, setPage] = useState(1);
 
   async function load() {
     setLoading(true);
-    setError("");
     try {
       const response = await fetch("/api/admin/community-rsvps", { cache: "no-store" });
       const result = await response.json() as { rsvps?: CommunityRsvpRecord[]; error?: string };
@@ -27,7 +26,7 @@ export default function AdminRsvpsPage() {
       setRsvps(result.rsvps ?? []);
       if (!selectedId && result.rsvps?.[0]) setSelectedId(result.rsvps[0].id);
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Unable to load RSVPs.");
+      notifyError(reason, "Unable to load RSVPs.");
     } finally {
       setLoading(false);
     }
@@ -61,8 +60,6 @@ export default function AdminRsvpsPage() {
           <RefreshCw size={14} className={loading ? "animate-spin" : undefined} /> {loading ? "Loading…" : "Refresh"}
         </Button>
       </div>
-
-      {error ? <p role="alert" className="border-2 border-primary bg-card px-3 py-2 text-xs text-primary">{error}</p> : null}
 
       {loading ? (
         <AdminPageLoading rows={2} />

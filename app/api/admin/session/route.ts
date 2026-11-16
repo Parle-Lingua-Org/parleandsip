@@ -1,12 +1,14 @@
-import { createClient } from "@/lib/supabase/server";
+import { isAdminPinUnlocked } from "@/lib/admin-pin";
+import { requireAdmin } from "@/lib/admin-auth";
 
 export async function GET() {
-  const supabase = await createClient();
-  const { data: { user }, error } = await supabase.auth.getUser();
-  if (error || !user) return Response.json({ error: "Not signed in." }, { status: 401 });
+  const auth = await requireAdmin({ requirePin: false });
+  if (auth.error) return auth.error;
 
-  const { data: profile, error: profileError } = await supabase.from("profiles").select("role, username").eq("id", user.id).maybeSingle();
-  if (profileError || profile?.role !== "admin") return Response.json({ error: "Administrator access required." }, { status: 403 });
-
-  return Response.json({ email: user.email, username: profile.username });
+  const pinUnlocked = await isAdminPinUnlocked(auth.user.id);
+  return Response.json({
+    email: auth.user.email,
+    username: auth.username,
+    pinUnlocked,
+  });
 }

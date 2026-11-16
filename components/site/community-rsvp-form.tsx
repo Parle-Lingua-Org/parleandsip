@@ -13,6 +13,7 @@ import {
   LEARNING_FRENCH_OPTIONS,
   MOTIVATION_OPTIONS,
 } from "@/lib/community-rsvp";
+import { notifyError } from "@/lib/notify";
 
 function toggleValue(list: string[], value: string) {
   return list.includes(value) ? list.filter((item) => item !== value) : [...list, value];
@@ -56,17 +57,15 @@ export function CommunityRsvpForm({ onDone }: { onDone?: () => void }) {
   const [heardFromOther, setHeardFromOther] = useState("");
   const [followingSocial, setFollowingSocial] = useState("");
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
   const [sent, setSent] = useState(false);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!learningFrench || !frenchLevel || !heardFrom || !followingSocial) {
-      setError("Please answer all required choice questions.");
+      notifyError("Please answer all required choice questions.");
       return;
     }
     setBusy(true);
-    setError("");
     try {
       const response = await fetch("/api/community-rsvp", {
         method: "POST",
@@ -93,7 +92,7 @@ export function CommunityRsvpForm({ onDone }: { onDone?: () => void }) {
       if (!response.ok) throw new Error(result.error || "Unable to submit RSVP.");
       setSent(true);
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Unable to submit RSVP.");
+      notifyError(reason, "Unable to submit RSVP.");
     } finally {
       setBusy(false);
     }
@@ -120,8 +119,6 @@ export function CommunityRsvpForm({ onDone }: { onDone?: () => void }) {
           Event: 1st Floor, Tropic Gallery Mall, beside Grand Square, CBD, Abuja. Required fields are marked *.
         </p>
       </div> */}
-      {error ? <p role="alert" className="border-2 border-primary bg-card px-3 py-2 text-xs text-primary">{error}</p> : null}
-
       <section className="grid gap-3 sm:grid-cols-2">
         <label className="grid gap-1 text-[10px] font-semibold sm:col-span-2">1. Email *<Input type="email" required value={email} onChange={(event) => setEmail(event.target.value)} /></label>
         <label className="grid gap-1 text-[10px] font-semibold">2. Full name *<Input required value={fullName} onChange={(event) => setFullName(event.target.value)} /></label>

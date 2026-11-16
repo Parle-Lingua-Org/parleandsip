@@ -1,3 +1,4 @@
+import { apiError } from "@/lib/api-response";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 type CheckoutBody = {
@@ -83,7 +84,6 @@ export async function POST(request: Request) {
 
     return Response.json({ authorizationUrl: paystack.data.authorization_url, reference: order.public_reference });
   } catch (reason) {
-    const message = reason instanceof Error ? reason.message : "Unable to start checkout.";
-    return Response.json({ error: message }, { status: 500 });
+    return apiError(reason, 500, "Unable to start checkout.");
   }
 }

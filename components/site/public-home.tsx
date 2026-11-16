@@ -32,6 +32,7 @@ import { formatNaira, initialSiteData } from "@/lib/site-data";
 import { BrandLogo } from "@/components/site/brand-logo";
 import { CommunityRsvpForm } from "@/components/site/community-rsvp-form";
 import { SiteFooter } from "@/components/site/site-footer";
+import { notifyError } from "@/lib/notify";
 
 export function PublicHome() {
   const settingsQuery = useSiteSettingsQuery();
@@ -48,7 +49,6 @@ export function PublicHome() {
   const [feedbackSubject, setFeedbackSubject] = useState("");
   const [feedbackMessage, setFeedbackMessage] = useState("");
   const [feedbackBusy, setFeedbackBusy] = useState(false);
-  const [feedbackError, setFeedbackError] = useState("");
   const [feedbackSent, setFeedbackSent] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<EventRecord | null>(null);
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
@@ -57,7 +57,6 @@ export function PublicHome() {
   const [buyerName, setBuyerName] = useState("");
   const [buyerEmail, setBuyerEmail] = useState("");
   const [orderComplete, setOrderComplete] = useState(false);
-  const [orderError, setOrderError] = useState("");
   const [checkoutUrl, setCheckoutUrl] = useState("");
   const [checkoutBusy, setCheckoutBusy] = useState(false);
 
@@ -82,7 +81,6 @@ export function PublicHome() {
       setSelectedEvent(event);
       setOrderComplete(false);
       setCheckoutUrl("");
-      setOrderError("Ticket sales for this experience have closed.");
       return;
     }
     setSelectedEvent(event);
@@ -92,14 +90,12 @@ export function PublicHome() {
     setBuyerName("");
     setBuyerEmail("");
     setOrderComplete(false);
-    setOrderError("");
     setCheckoutUrl("");
     void eventsQuery.refetch().then((result) => {
       const fresh = result.data?.find((item) => item.id === event.id);
       if (!fresh) return;
       setSelectedEvent((current) => (current?.id === fresh.id ? fresh : current));
       if (!isEventSalesOpen(fresh)) {
-        setOrderError("Ticket sales for this experience have closed.");
         return;
       }
       setSelectedTierId((current) => {
@@ -114,15 +110,13 @@ export function PublicHome() {
     event.preventDefault();
     if (!selectedEvent) return;
     if (!isEventSalesOpen(selectedEvent)) {
-      setOrderError("Ticket sales for this experience have closed.");
       return;
     }
     if (!selectedTier || quantity > selectedTierRemaining) {
-      setOrderError("That ticket type has sold out. Choose another option.");
+      notifyError("That ticket type has sold out. Choose another option.");
       return;
     }
     setCheckoutBusy(true);
-    setOrderError("");
     try {
       const response = await fetch("/api/paystack/initialize", {
         method: "POST",
@@ -140,7 +134,7 @@ export function PublicHome() {
       setOrderComplete(true);
       window.location.assign(result.authorizationUrl);
     } catch (reason) {
-      setOrderError(reason instanceof Error ? reason.message : "Unable to start checkout. Please try again.");
+      notifyError(reason, "Unable to start checkout. Please try again.");
     } finally {
       setCheckoutBusy(false);
     }
@@ -317,7 +311,6 @@ export function PublicHome() {
             onClick={() => {
               setFeedbackOpen(true);
               setFeedbackSent(false);
-              setFeedbackError("");
             }}
           >
             Send feedback <ArrowRight size={14} />
@@ -380,7 +373,6 @@ export function PublicHome() {
         onOpenChange={(open) => {
           setFeedbackOpen(open);
           if (!open) {
-            setFeedbackError("");
             setFeedbackBusy(false);
           }
         }}
@@ -402,7 +394,6 @@ export function PublicHome() {
               onSubmit={async (event) => {
                 event.preventDefault();
                 setFeedbackBusy(true);
-                setFeedbackError("");
                 try {
                   const response = await fetch("/api/contact", {
                     method: "POST",
@@ -422,7 +413,7 @@ export function PublicHome() {
                   setFeedbackSubject("");
                   setFeedbackMessage("");
                 } catch (reason) {
-                  setFeedbackError(reason instanceof Error ? reason.message : "Unable to send your message.");
+                  notifyError(reason, "Unable to send your message.");
                 } finally {
                   setFeedbackBusy(false);
                 }
@@ -449,7 +440,6 @@ export function PublicHome() {
               <label className="grid gap-1 text-[10px] font-semibold">Message
                 <Textarea required rows={5} maxLength={4000} value={feedbackMessage} onChange={(event) => setFeedbackMessage(event.target.value)} placeholder="Tell us what’s on your mind…" />
               </label>
-              {feedbackError ? <p role="alert" className="text-[10px] text-accent-foreground">{feedbackError}</p> : null}
               <Button className="w-full" type="submit" disabled={feedbackBusy}>
                 {feedbackBusy ? "Sending…" : "Send message"} <ArrowRight size={15} />
               </Button>
@@ -477,12 +467,11 @@ export function PublicHome() {
               <p className="text-[9px] text-muted-foreground">Payments accepted until {new Date(selectedEvent.salesEndAt).toLocaleString("en-NG")}.</p>
             ) : null}
             <fieldset><legend className="mb-2 font-mono text-[8px] text-muted-foreground">PICK YOUR PASS</legend><div className="grid gap-2">
-              {selectedEvent.ticketTiers.map((tier) => { const remaining = tierRemaining(selectedEvent, tier.id); return <button key={tier.id} type="button" disabled={remaining === 0} aria-pressed={selectedTier?.id === tier.id} onClick={() => { setSelectedTierId(tier.id); setQuantity((count) => Math.min(count, Math.max(remaining, 1))); setOrderError(""); }} className={`flex min-h-14 items-center gap-3 border-2 px-3 text-left disabled:cursor-not-allowed disabled:opacity-50 ${selectedTier?.id === tier.id ? "border-foreground bg-success shadow-[2px_2px_0_var(--foreground)]" : "border-dap-border-muted bg-card"}`}><span className="grid size-4 place-items-center rounded-full border border-foreground">{selectedTier?.id === tier.id && <span className="size-2 rounded-full bg-foreground" />}</span><span className="flex-1"><strong className="block text-[10px]">{tier.name}</strong><small className="text-[9px] text-muted-foreground">{tier.description} · {remaining ? `${remaining} left` : "Sold out"}</small></span><strong className="text-xs">{formatNaira(tier.price)}</strong></button>; })}
+              {selectedEvent.ticketTiers.map((tier) => { const remaining = tierRemaining(selectedEvent, tier.id); return <button key={tier.id} type="button" disabled={remaining === 0} aria-pressed={selectedTier?.id === tier.id} onClick={() => { setSelectedTierId(tier.id); setQuantity((count) => Math.min(count, Math.max(remaining, 1))); }} className={`flex min-h-14 items-center gap-3 border-2 px-3 text-left disabled:cursor-not-allowed disabled:opacity-50 ${selectedTier?.id === tier.id ? "border-foreground bg-success shadow-[2px_2px_0_var(--foreground)]" : "border-dap-border-muted bg-card"}`}><span className="grid size-4 place-items-center rounded-full border border-foreground">{selectedTier?.id === tier.id && <span className="size-2 rounded-full bg-foreground" />}</span><span className="flex-1"><strong className="block text-[10px]">{tier.name}</strong><small className="text-[9px] text-muted-foreground">{tier.description} · {remaining ? `${remaining} left` : "Sold out"}</small></span><strong className="text-xs">{formatNaira(tier.price)}</strong></button>; })}
             </div></fieldset>
             <div className="flex items-center justify-between border-b border-dap-border-muted pb-3"><div><strong className="block text-[10px]">Tickets</strong><small className="text-[9px] text-muted-foreground">{selectedTierRemaining} available · max 6 per order</small></div><div className="flex items-center gap-3"><Button type="button" variant="outline" size="icon" aria-label="Remove one ticket" disabled={quantity <= 1} onClick={() => setQuantity((count) => Math.max(1, count - 1))}><Minus size={14} /></Button><span aria-live="polite" className="min-w-3 text-center text-xs">{quantity}</span><Button type="button" variant="outline" size="icon" aria-label="Add one ticket" disabled={quantity >= Math.min(6, selectedTierRemaining)} onClick={() => setQuantity((count) => Math.min(6, selectedTierRemaining, count + 1))}><Plus size={14} /></Button></div></div>
             <div className="grid gap-3 sm:grid-cols-2"><label className="grid gap-1 text-[10px] font-semibold">Your name <Input autoComplete="name" required value={buyerName} onChange={(event) => setBuyerName(event.target.value)} /></label><label className="grid gap-1 text-[10px] font-semibold">Email for your ticket <Input autoComplete="email" type="email" required value={buyerEmail} onChange={(event) => setBuyerEmail(event.target.value)} /></label></div>
             <div className="flex items-center justify-between text-xs"><span>Total <small className="text-[9px] text-muted-foreground"> · fees at checkout</small></span><strong className="text-base">{formatNaira(ticketPrice * quantity)}</strong></div>
-            {orderError && <p role="alert" className="text-[10px] text-accent-foreground">{orderError}</p>}
             <Button className="w-full" type="submit" disabled={selectedTierRemaining === 0 || checkoutBusy}>{checkoutBusy ? "Opening Paystack…" : selectedTierRemaining ? "Continue to Paystack" : "Sold out"} <ArrowRight size={15} /></Button>
             <p className="text-center text-[9px] leading-5 text-muted-foreground">
               By purchasing, you agree to our{" "}

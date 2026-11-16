@@ -7,7 +7,9 @@ import { AdminPageLoading } from "@/components/admin/page-loading";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 import { Input } from "@/components/ui/input";
+import { notifyError, notifySuccess } from "@/lib/notify";
 import { queryKeys } from "@/lib/query-keys";
 import { formatNaira } from "@/lib/site-data";
 
@@ -47,13 +49,12 @@ function statusVariant(status: string) {
 
 export default function AdminOrdersPage() {
   const queryClient = useQueryClient();
+  const confirm = useConfirm();
   const [query, setQuery] = useState("");
   const [orders, setOrders] = useState<AdminOrder[]>([]);
   const [initialLoading, setInitialLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState("");
   const [actionBusyId, setActionBusyId] = useState<string | null>(null);
-  const [actionMessage, setActionMessage] = useState("");
 
   const refreshAvailability = useCallback(async () => {
     await Promise.all([
@@ -66,7 +67,6 @@ export default function AdminOrdersPage() {
     const silent = Boolean(options?.silent);
     if (silent) setRefreshing(true);
     else setInitialLoading(true);
-    setError("");
     try {
       if (options?.expireStale) {
         await fetch("/api/admin/orders/actions", {
@@ -79,12 +79,12 @@ export default function AdminOrdersPage() {
       const response = await fetch("/api/admin/orders", { cache: "no-store" });
       const result = await response.json() as { orders?: AdminOrder[]; error?: string };
       if (!response.ok) {
-        setError(result.error ?? "Unable to load ticket orders.");
+        notifyError(result.error ?? "Unable to load ticket orders.");
         return;
       }
       setOrders(result.orders ?? []);
-    } catch {
-      setError("Unable to load ticket orders.");
+    } catch (reason) {
+      notifyError(reason, "Unable to load ticket orders.");
     } finally {
       if (silent) setRefreshing(false);
       else setInitialLoading(false);
@@ -106,8 +106,6 @@ export default function AdminOrdersPage() {
 
   async function runAction(orderId: string, action: "verify" | "cancel") {
     setActionBusyId(orderId);
-    setActionMessage("");
-    setError("");
     try {
       const response = await fetch("/api/admin/orders/actions", {
         method: "POST",
@@ -116,11 +114,11 @@ export default function AdminOrdersPage() {
       });
       const result = await response.json() as { error?: string; message?: string; status?: string; inventoryReleased?: boolean };
       if (!response.ok) throw new Error(result.error || "Unable to update order.");
-      setActionMessage(result.message || `Order is now ${result.status}.`);
+      notifySuccess(result.message || `Order is now ${result.status}.`);
       await loadOrders({ silent: true });
       await refreshAvailability();
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Unable to update order.");
+      notifyError(reason, "Unable to update order.");
     } finally {
       setActionBusyId(null);
     }
@@ -172,12 +170,6 @@ export default function AdminOrdersPage() {
           <Button variant="outline" disabled={!visibleOrders.length || refreshing} onClick={exportCsv}><Download size={14} /> Export CSV</Button>
         </div>
       </div>
-
-      {(error || actionMessage) && (
-        <p role={error ? "alert" : "status"} className={`border-2 bg-card px-3 py-2 text-xs ${error ? "border-primary text-primary" : "border-foreground text-foreground"}`}>
-          {error || actionMessage}
-        </p>
-      )}
 
       <div className="grid gap-3 sm:grid-cols-4">
         <Card className="p-4 shadow-[3px_3px_0_var(--foreground)]"><p className="text-[10px] text-muted-foreground">Orders</p><p className="mt-2 text-2xl font-bold">{visibleOrders.length}</p></Card>
@@ -259,9 +251,15 @@ export default function AdminOrdersPage() {
                                   variant="ghost"
                                   disabled={actionBusyId === order.id}
                                   onClick={() => {
-                                    if (window.confirm("Cancel this pending order and release the held tickets?")) {
-                                      void runAction(order.id, "cancel");
-                                    }
+                                    void confirm({
+                                      title: "Cancel this order?",
+                                      description: "This cancels the pending reservation and releases the held tickets back to inventory.",
+                                      confirmLabel: "Cancel & release",
+                                      cancelLabel: "Keep pending",
+                                      tone: "danger",
+                                    }).then((ok) => {
+                                      if (ok) void runAction(order.id, "cancel");
+                                    });
                                   }}
                                 >
                                   Cancel &amp; release

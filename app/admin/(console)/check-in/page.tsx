@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { notifyError } from "@/lib/notify";
 
 type CheckInEvent = {
   id: string;
@@ -29,13 +30,10 @@ export default function AdminCheckInPage() {
   const [events, setEvents] = useState<CheckInEvent[]>([]);
   const [eventsLoading, setEventsLoading] = useState(true);
   const [eventId, setEventId] = useState("");
-  const [eventsError, setEventsError] = useState("");
   const [manualCode, setManualCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [cameraOn, setCameraOn] = useState(false);
-  const [cameraError, setCameraError] = useState("");
   const [message, setMessage] = useState("");
-  const [error, setError] = useState("");
   const [lastResult, setLastResult] = useState<CheckInResult | null>(null);
   const [history, setHistory] = useState<CheckInResult[]>([]);
   const scannerRef = useRef<{ stop: () => Promise<void> } | null>(null);
@@ -57,14 +55,14 @@ export default function AdminCheckInPage() {
         const result = await response.json() as { events?: CheckInEvent[]; error?: string };
         if (!active) return;
         if (!response.ok) {
-          setEventsError(result.error ?? "Unable to load events.");
+          notifyError(result.error ?? "Unable to load events.");
           return;
         }
         const list = result.events ?? [];
         setEvents(list);
         if (list.length === 1) setEventId(list[0].id);
       } catch {
-        if (active) setEventsError("Unable to load events.");
+        if (active) notifyError("Unable to load events.");
       } finally {
         if (active) setEventsLoading(false);
       }
@@ -78,11 +76,10 @@ export default function AdminCheckInPage() {
     const selectedEventId = eventIdRef.current;
     if (!code || busy) return;
     if (!selectedEventId) {
-      setError("Select the event before scanning tickets.");
+      notifyError("Select the event before scanning tickets.");
       return;
     }
     setBusy(true);
-    setError("");
     setMessage("");
     try {
       const response = await fetch("/api/admin/check-in", {
@@ -93,7 +90,7 @@ export default function AdminCheckInPage() {
       const result = await response.json() as CheckInResult & { error?: string };
       if (!response.ok) {
         setLastResult(null);
-        setError(result.error ?? "Unable to check this ticket in.");
+        notifyError(result.error ?? "Unable to check this ticket in.");
         return;
       }
       setLastResult(result);
@@ -102,7 +99,7 @@ export default function AdminCheckInPage() {
       setManualCode("");
     } catch {
       setLastResult(null);
-      setError("Unable to reach check-in.");
+      notifyError("Unable to reach check-in.");
     } finally {
       setBusy(false);
     }
@@ -110,11 +107,9 @@ export default function AdminCheckInPage() {
 
   async function startCamera() {
     if (!eventIdRef.current) {
-      setError("Select the event before scanning tickets.");
+      notifyError("Select the event before scanning tickets.");
       return;
     }
-    setCameraError("");
-    setError("");
     try {
       const { Html5Qrcode } = await import("html5-qrcode");
       const scanner = new Html5Qrcode(readerId);
@@ -136,7 +131,7 @@ export default function AdminCheckInPage() {
       setCameraOn(true);
     } catch (reason) {
       setCameraOn(false);
-      setCameraError(reason instanceof Error ? reason.message : "Camera access was blocked.");
+      notifyError(reason, "Camera access was blocked.");
       scannerRef.current = null;
     }
   }
@@ -178,7 +173,6 @@ export default function AdminCheckInPage() {
             value={eventId}
             onChange={(event) => {
               setEventId(event.target.value);
-              setError("");
               setMessage("");
               setLastResult(null);
             }}
@@ -192,7 +186,6 @@ export default function AdminCheckInPage() {
           </select>
         </label>
         {selectedEvent ? <p className="mt-3 text-[10px] text-muted-foreground">Scanning for <strong>{selectedEvent.title}</strong>.</p> : null}
-        {eventsError ? <p role="alert" className="mt-3 text-[10px] text-accent-foreground">{eventsError}</p> : null}
       </Card>
 
       <div className="grid items-start gap-5 xl:grid-cols-[1.1fr_.9fr]">
@@ -219,7 +212,6 @@ export default function AdminCheckInPage() {
               </div>
             ) : null}
             <div id={readerId} className={cameraOn ? "min-h-64 overflow-hidden border-2 border-foreground bg-secondary" : "hidden"} />
-            {cameraError ? <p role="alert" className="text-[10px] text-accent-foreground">{cameraError}</p> : null}
           </div>
         </Card>
 
@@ -249,7 +241,6 @@ export default function AdminCheckInPage() {
               <p className="mt-3 text-[10px] text-muted-foreground">No successful check-in yet on this screen.</p>
             )}
             {message ? <p role="status" className="mt-3 text-xs font-semibold text-dap-green">{message}</p> : null}
-            {error ? <p role="alert" className="mt-3 text-xs text-accent-foreground">{error}</p> : null}
           </Card>
         </div>
       </div>

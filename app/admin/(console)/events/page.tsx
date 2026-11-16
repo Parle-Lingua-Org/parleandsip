@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { AdminPageLoading } from "@/components/admin/page-loading";
+import { useConfirm } from "@/components/ui/confirm-dialog";
 import { ImagePicker } from "@/components/ui/image-picker";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -18,7 +19,8 @@ import {
 } from "@/hooks/use-site-data";
 import type { EventRecord, SchedulePrecision } from "@/lib/events-shared";
 import { createTicketTiers, formatNaira, type TicketTier } from "@/lib/site-data";
-import { imageFileToDataUrl } from "@/lib/image-upload";
+import { uploadImageToStorage } from "@/lib/image-upload";
+import { notifyError, notifySuccess } from "@/lib/notify";
 
 const EVENTS_PAGE_SIZE = 8;
 
@@ -99,6 +101,7 @@ function fromRecord(event: EventRecord): EventDraft {
 }
 
 export default function AdminEventsPage() {
+  const confirm = useConfirm();
   const settingsQuery = useSiteSettingsQuery();
   const eventsQuery = useAdminEventsQuery();
   const saveMutation = useSaveEventMutation();
@@ -110,8 +113,6 @@ export default function AdminEventsPage() {
   const events = eventsQuery.data ?? [];
   const [draft, setDraft] = useState<EventDraft | null>(null);
   const [galleryUrl, setGalleryUrl] = useState("");
-  const [uploadError, setUploadError] = useState("");
-  const [formError, setFormError] = useState("");
   const [pickBusy, setPickBusy] = useState(false);
   const [listPage, setListPage] = useState(1);
 
@@ -125,12 +126,19 @@ export default function AdminEventsPage() {
     if (listPage > totalPages) setListPage(totalPages);
   }, [listPage, totalPages]);
 
+  useEffect(() => {
+    if (eventsQuery.error) notifyError(eventsQuery.error, "Unable to load events.");
+  }, [eventsQuery.error]);
+
+  useEffect(() => {
+    if (settingsQuery.error) notifyError(settingsQuery.error, "Unable to load site settings.");
+  }, [settingsQuery.error]);
+
   const saved = useMemo(() => saveMutation.isSuccess && !saveMutation.isPending, [saveMutation.isPending, saveMutation.isSuccess]);
 
   function updateDraft<K extends keyof EventDraft>(key: K, value: EventDraft[K]) {
     setDraft((current) => (current ? { ...current, [key]: value } : current));
     saveMutation.reset();
-    setFormError("");
   }
 
   function updateTier(tierId: string, patch: Partial<TicketTier>) {
@@ -141,7 +149,6 @@ export default function AdminEventsPage() {
   async function saveDraft(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!draft) return;
-    setFormError("");
     try {
       const savedEvent = await saveMutation.mutateAsync({
         id: draft.id,
@@ -163,20 +170,27 @@ export default function AdminEventsPage() {
         ticketTiers: draft.ticketTiers,
       });
       setDraft(fromRecord(savedEvent));
+      notifySuccess("Event saved.");
     } catch (reason) {
-      setFormError(reason instanceof Error ? reason.message : "Unable to save event.");
+      notifyError(reason, "Unable to save event.");
     }
   }
 
   async function uploadGallery(files: FileList | null) {
     if (!files || !draft) return;
-    setUploadError("");
     try {
-      const images = await Promise.all(Array.from(files).slice(0, 5).map((file) => imageFileToDataUrl(file, 1200)));
-      setDraft((current) => current ? { ...current, gallery: [...current.gallery, ...images] } : current);
+      const images = await Promise.all(
+        Array.from(files).slice(0, 5).map((file) =>
+          uploadImageToStorage(file, {
+            folder: draft.id ? `events/${draft.id}` : "events/drafts",
+            maxDimension: 1200,
+          }),
+        ),
+      );
+      setDraft((current) => current ? { ...current, gallery: [...current.gallery, ...images].slice(0, 8) } : current);
       saveMutation.reset();
     } catch (reason) {
-      setUploadError(reason instanceof Error ? reason.message : "Unable to read one of these images.");
+      notifyError(reason, "Unable to upload one of these images.");
     }
   }
 
@@ -192,14 +206,8 @@ export default function AdminEventsPage() {
           <h1 className="mt-1 text-3xl font-bold tracking-tight">Events & tickets</h1>
           <p className="mt-2 text-xs text-muted-foreground">Events, tiers and galleries save to Supabase and power public checkout.</p>
         </div>
-        <Button onClick={() => { setDraft(newEvent(cityName)); saveMutation.reset(); setFormError(""); }}><Plus size={14} /> Create event</Button>
+        <Button onClick={() => { setDraft(newEvent(cityName)); saveMutation.reset(); }}><Plus size={14} /> Create event</Button>
       </div>
-
-      {(eventsQuery.error || settingsQuery.error) && (
-        <p role="alert" className="border-2 border-primary bg-card px-3 py-2 text-xs text-primary">
-          {(eventsQuery.error as Error | null)?.message || (settingsQuery.error as Error | null)?.message || "Unable to load events."}
-        </p>
-      )}
 
       <Card className="p-4 shadow-[4px_4px_0_var(--foreground)] sm:p-5">
         <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,22rem)] lg:items-end">
@@ -221,7 +229,7 @@ export default function AdminEventsPage() {
                 setPickBusy(true);
                 void saveSettingsMutation
                   .mutateAsync({ content: { featuredEventId: nextSlug } })
-                  .catch((reason) => setFormError(reason instanceof Error ? reason.message : "Unable to set this week's pick."))
+                  .catch((reason) => notifyError(reason, "Unable to set this week's pick."))
                   .finally(() => setPickBusy(false));
               }}
             >
@@ -246,7 +254,7 @@ export default function AdminEventsPage() {
           </div>
           <div className="divide-y divide-dap-border-muted">
             {pageEvents.map((event) => (
-              <button key={event.id} type="button" onClick={() => { setDraft(fromRecord(event)); saveMutation.reset(); setFormError(""); }} className={`flex w-full items-center gap-3 p-3 text-left hover:bg-muted ${draft?.id === event.id ? "bg-secondary" : ""}`}>
+              <button key={event.id} type="button" onClick={() => { setDraft(fromRecord(event)); saveMutation.reset(); }} className={`flex w-full items-center gap-3 p-3 text-left hover:bg-muted ${draft?.id === event.id ? "bg-secondary" : ""}`}>
                 <span className="size-12 shrink-0 border border-foreground bg-cover bg-center" style={{ backgroundImage: event.image ? `url("${event.image}")` : undefined }} />
                 <span className="min-w-0 flex-1">
                   <strong className="block truncate text-xs">{event.title}</strong>
@@ -284,8 +292,6 @@ export default function AdminEventsPage() {
                 </div>
               </div>
 
-              {formError ? <p role="alert" className="text-xs text-primary">{formError}</p> : null}
-
               <section className="space-y-3">
                 <h3 className="text-xs font-bold">Basics</h3>
                 <div className="grid gap-3 sm:grid-cols-2">
@@ -297,7 +303,6 @@ export default function AdminEventsPage() {
                     const next = event.target.value as SchedulePrecision;
                     setDraft((current) => current ? { ...current, schedulePrecision: next, startsAt: next === "tbd" ? null : current.startsAt } : current);
                     saveMutation.reset();
-                    setFormError("");
                   }}><option value="datetime">Exact date & time</option><option value="month">Month only</option><option value="tbd">TBD</option></select></label>
                   {draft.schedulePrecision === "datetime" ? (
                     <label className="grid gap-1 text-[10px] font-semibold">Starts at<Input type="datetime-local" required value={toLocalInputValue(draft.startsAt)} onChange={(event) => updateDraft("startsAt", event.target.value ? new Date(event.target.value).toISOString() : null)} /></label>
@@ -325,7 +330,7 @@ export default function AdminEventsPage() {
                         if (!draft.slug) return;
                         setPickBusy(true);
                         void saveSettingsMutation.mutateAsync({ content: { featuredEventId: draft.slug } })
-                          .catch((reason) => setFormError(reason instanceof Error ? reason.message : "Unable to set this week's pick."))
+                          .catch((reason) => notifyError(reason, "Unable to set this week's pick."))
                           .finally(() => setPickBusy(false));
                       }}
                     >
@@ -357,7 +362,7 @@ export default function AdminEventsPage() {
 
               <section className="space-y-4 border-t border-dap-border-muted pt-5">
                 <div><h3 className="text-xs font-bold">Images</h3></div>
-                <ImagePicker label="Main event image" value={draft.image} onChange={(image) => updateDraft("image", image)} />
+                <ImagePicker label="Main event image" value={draft.image} folder={draft.id ? `events/${draft.id}` : "events/drafts"} onChange={(image) => updateDraft("image", image)} />
                 <div>
                   <p className="mb-2 text-[10px] font-semibold">Gallery images</p>
                   <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
@@ -384,7 +389,6 @@ export default function AdminEventsPage() {
                     <Button type="button" variant="outline" size="sm" disabled={!galleryUrl.trim()} onClick={() => { updateDraft("gallery", [...draft.gallery, galleryUrl.trim()]); setGalleryUrl(""); }}><Plus size={13} /> Add URL</Button>
                     <label className="inline-flex h-9 cursor-pointer items-center gap-2 border-2 border-foreground bg-card px-3 text-[10px] font-semibold shadow-[2px_2px_0_var(--foreground)] hover:bg-secondary"><ImagePlus size={13} /> Upload photos<input className="sr-only" type="file" accept="image/*" multiple onChange={(event) => { void uploadGallery(event.target.files); event.currentTarget.value = ""; }} /></label>
                   </div>
-                  {uploadError && <p role="alert" className="mt-2 text-[9px] text-accent-foreground">{uploadError}</p>}
                 </div>
               </section>
 
@@ -396,9 +400,20 @@ export default function AdminEventsPage() {
                   disabled={!draft.id || deleteMutation.isPending}
                   onClick={() => {
                     if (!draft.id) return;
-                    if (!window.confirm(`Delete “${draft.title}”?`)) return;
-                    void deleteMutation.mutateAsync(draft.id).then(() => setDraft(null)).catch((reason) => {
-                      setFormError(reason instanceof Error ? reason.message : "Unable to delete event.");
+                    void confirm({
+                      title: `Delete “${draft.title}”?`,
+                      description: "This removes the event and its ticket tiers from Supabase.",
+                      confirmLabel: "Delete event",
+                      tone: "danger",
+                    }).then(async (ok) => {
+                      if (!ok) return;
+                      try {
+                        await deleteMutation.mutateAsync(draft.id!);
+                        setDraft(null);
+                        notifySuccess("Event deleted.");
+                      } catch (reason) {
+                        notifyError(reason, "Unable to delete event.");
+                      }
                     });
                   }}
                 >

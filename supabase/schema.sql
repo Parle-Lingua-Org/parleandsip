@@ -51,7 +51,7 @@ create table if not exists public.event_images (
   alt_text text not null default '',
   sort_order integer not null default 0,
   created_at timestamptz not null default now(),
-  unique (event_id, image_url)
+  unique (event_id, sort_order)
 );
 
 create table if not exists public.ticket_tiers (
@@ -139,9 +139,16 @@ create table if not exists public.site_settings (
   theme jsonb not null default '{}'::jsonb,
   logo_url text not null default '',
   favicon_url text not null default '',
+  admin_pin_hash text,
+  admin_pin_otp_hash text,
+  admin_pin_otp_expires_at timestamptz,
   updated_by uuid references public.profiles (id) on delete set null,
   updated_at timestamptz not null default now()
 );
+
+alter table public.site_settings add column if not exists admin_pin_hash text;
+alter table public.site_settings add column if not exists admin_pin_otp_hash text;
+alter table public.site_settings add column if not exists admin_pin_otp_expires_at timestamptz;
 
 -- Community RSVP / "Join our community" submissions (replaces Google Form)
 create table if not exists public.community_rsvps (

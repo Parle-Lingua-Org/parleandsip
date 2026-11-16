@@ -11,6 +11,7 @@ import { ImagePicker } from "@/components/ui/image-picker";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useAdminEventsQuery, useSaveSiteSettingsMutation, useSiteSettingsQuery } from "@/hooks/use-site-data";
+import { notifyError, notifySuccess } from "@/lib/notify";
 import { initialSiteData, type FaqItem, type SiteContent, type SiteTheme } from "@/lib/site-data";
 
 const themeFields: { key: keyof SiteTheme; label: string; note: string }[] = [
@@ -109,7 +110,6 @@ export default function AdminContentPage() {
   const [contentDraft, setContentDraft] = useState<SiteContent>(initialSiteData.content);
   const [themeDraft, setThemeDraft] = useState<SiteTheme>(initialSiteData.theme);
   const [saved, setSaved] = useState(false);
-  const [error, setError] = useState("");
   const events = eventsQuery.data ?? [];
   const activePalette = palettePresets.find((palette) => (Object.keys(palette.colors) as Array<keyof SiteTheme>).every((key) => palette.colors[key] === themeDraft[key]))?.name ?? "Custom palette";
 
@@ -136,12 +136,12 @@ export default function AdminContentPage() {
 
   async function saveSettings(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setError("");
     try {
       await saveMutation.mutateAsync({ content: contentDraft, theme: themeDraft });
       setSaved(true);
+      notifySuccess("Site settings saved.");
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Unable to save site settings.");
+      notifyError(reason, "Unable to save site settings.");
     }
   }
 
@@ -152,8 +152,6 @@ export default function AdminContentPage() {
   return (
     <form className="space-y-6" onSubmit={(event) => void saveSettings(event)}>
       <div className="flex flex-wrap items-end justify-between gap-4"><div><p className="font-mono text-[9px] tracking-wide text-muted-foreground">SUPABASE · BRAND, HOMEPAGE & THEME</p><h1 className="mt-1 text-3xl font-bold tracking-tight">Site content</h1><p className="mt-2 max-w-2xl text-xs leading-5 text-muted-foreground">Edit the public header, hero, homepage panels, footer and shared palette. Changes save to Supabase for every visitor.</p></div><div className="flex items-center gap-3">{saved && <span role="status" className="flex items-center gap-1 text-xs text-dap-green"><Check size={14} /> Saved</span>}<Button type="submit" disabled={saveMutation.isPending}><Save size={14} /> {saveMutation.isPending ? "Saving…" : "Save all changes"}</Button></div></div>
-      {error ? <p role="alert" className="border-2 border-primary bg-card px-3 py-2 text-xs text-primary">{error}</p> : null}
-
       <Card className="grid gap-5 p-4 shadow-[4px_4px_0_var(--foreground)] md:grid-cols-2 sm:p-6">
         <div>
           <h2 className="font-bold">Logo</h2>

@@ -1,29 +1,26 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
-import { Check, KeyRound, Save } from "lucide-react";
+import { KeyRound, Save } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { notifyError, notifySuccess } from "@/lib/notify";
 
 export default function AdminPasswordPage() {
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [message, setMessage] = useState("");
-  const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
   async function changePassword(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setError("");
-    setMessage("");
     if (newPassword.length < 10) {
-      setError("Use at least 10 characters for the new password.");
+      notifyError("Use at least 10 characters for the new password.");
       return;
     }
     if (newPassword !== confirmPassword) {
-      setError("The new password and confirmation do not match.");
+      notifyError("The new password and confirmation do not match.");
       return;
     }
 
@@ -36,9 +33,9 @@ export default function AdminPasswordPage() {
       setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");
-      setMessage("Password updated successfully.");
+      notifySuccess("Password updated successfully.");
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Unable to update the password.");
+      notifyError(reason, "Unable to update the password.");
     } finally {
       setBusy(false);
     }
@@ -53,8 +50,6 @@ export default function AdminPasswordPage() {
           <label className="grid gap-1.5 text-xs font-semibold">Current password<Input type="password" autoComplete="current-password" required value={currentPassword} onChange={(event) => setCurrentPassword(event.target.value)} /></label>
           <label className="grid gap-1.5 text-xs font-semibold">New password<Input type="password" autoComplete="new-password" minLength={10} required value={newPassword} onChange={(event) => setNewPassword(event.target.value)} /></label>
           <label className="grid gap-1.5 text-xs font-semibold">Confirm new password<Input type="password" autoComplete="new-password" minLength={10} required value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} /></label>
-          {error && <p role="alert" className="border-2 border-accent bg-accent/20 p-2 text-xs">{error}</p>}
-          {message && <p role="status" className="flex items-center gap-2 border-2 border-primary bg-success p-2 text-xs"><Check size={14} />{message}</p>}
           <Button type="submit" disabled={busy} className="mt-1"><Save size={14} />{busy ? "Updating…" : "Update password"}</Button>
         </form>
       </Card>
