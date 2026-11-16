@@ -1,3 +1,8 @@
+export type FaqItem = {
+  question: string;
+  answer: string;
+};
+
 export type EventItem = {
   id: string;
   title: string;
@@ -38,6 +43,12 @@ export type SiteContent = {
   aboutTitle: string;
   aboutBody: string;
   aboutImage: string;
+  aboutFaq: FaqItem[];
+  policiesTicketPurchase: string;
+  policiesRefund: string;
+  policiesTicketTransfer: string;
+  policiesFaq: FaqItem[];
+  policiesDocumentUrl: string;
   contactPageEyebrow: string;
   contactPageTitle: string;
   contactPageDescription: string;
@@ -130,6 +141,19 @@ export const initialSiteData: SiteData = {
     aboutTitle: "French, culture & connection.",
     aboutBody: "Parle & Sip brings French learners, Francophones, Francophiles and culture enthusiasts together in Abuja to practice French, explore Francophone culture and make meaningful connections.\n\nWe gather around conversation, food, art, games and shared curiosity — so learning French feels like living it.",
     aboutImage: "",
+    aboutFaq: [
+      { question: "Who can join Parle & Sip?", answer: "Francophones, Francophiles and French learners of all levels are welcome." },
+      { question: "Do I need to speak fluent French?", answer: "No. Come as you are — we create space for beginners through fluent speakers." },
+      { question: "How do tickets work?", answer: "Choose an experience, pick a ticket type, and complete payment. Your QR ticket is emailed after confirmation." },
+    ],
+    policiesTicketPurchase: "Tickets are sold for specific Parle & Sip experiences. Your purchase confirms your place for the selected date, venue and ticket type. A confirmation email with your QR ticket is sent after successful payment.",
+    policiesRefund: "Refund and cancellation requests must be sent to Parle & Sip before the experience. Approved refunds follow our processing timeline. No-shows are not eligible for refunds. Parle & Sip may reschedule or cancel an experience and will offer a transfer or refund in those cases.",
+    policiesTicketTransfer: "Tickets may be transferred to another person before the experience by contacting Parle & Sip with the original buyer details and the new guest name. The QR ticket remains the entry pass and should only be presented by the attending guest.",
+    policiesFaq: [
+      { question: "Can I change my ticket type after purchase?", answer: "Contact us as soon as possible. Changes depend on availability and may require a price adjustment." },
+      { question: "What if an event is postponed?", answer: "Your ticket remains valid for the new date, or you can request a refund according to our refund policy." },
+    ],
+    policiesDocumentUrl: "",
     contactPageEyebrow: "GET IN TOUCH",
     contactPageTitle: "Say hello.",
     contactPageDescription: "Questions about a seat, a collaboration, or the next gathering. Write, message, or find us on social.",

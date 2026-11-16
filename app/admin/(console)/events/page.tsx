@@ -8,6 +8,7 @@ import { Card } from "@/components/ui/card";
 import { ImagePicker } from "@/components/ui/image-picker";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Textarea } from "@/components/ui/textarea";
 import {
   useAdminEventsQuery,
   useDeleteEventMutation,
@@ -16,7 +17,7 @@ import {
   useSiteSettingsQuery,
 } from "@/hooks/use-site-data";
 import type { EventRecord, SchedulePrecision } from "@/lib/events-shared";
-import { createTicketTiers, formatNaira, parseEventAreas, type TicketTier } from "@/lib/site-data";
+import { createTicketTiers, formatNaira, type TicketTier } from "@/lib/site-data";
 import { imageFileToDataUrl } from "@/lib/image-upload";
 
 const EVENTS_PAGE_SIZE = 8;
@@ -25,13 +26,12 @@ type EventDraft = {
   id?: string;
   slug?: string;
   title: string;
+  summary: string;
   host: string;
   category: string;
   startsAt: string | null;
   schedulePrecision: SchedulePrecision;
   venue: string;
-  area: string;
-  languages: string[];
   ticketTiers: TicketTier[];
   image: string;
   gallery: string[];
@@ -55,20 +55,19 @@ function toMonthInputValue(iso: string | null) {
   return local.toISOString().slice(0, 7);
 }
 
-function newEvent(cityName: string, defaultArea: string): EventDraft {
+function newEvent(cityName: string): EventDraft {
   const id = crypto.randomUUID();
   const starts = new Date();
   starts.setDate(starts.getDate() + 7);
   starts.setHours(16, 0, 0, 0);
   return {
     title: "New Parle & Sip experience",
+    summary: "",
     host: "Parle & Sip",
     category: "",
     startsAt: starts.toISOString(),
     schedulePrecision: "datetime",
     venue: `Venue name, ${cityName}`,
-    area: defaultArea,
-    languages: ["French", "English"],
     ticketTiers: createTicketTiers(id, 5000),
     image: "",
     gallery: [],
@@ -82,13 +81,12 @@ function fromRecord(event: EventRecord): EventDraft {
     id: event.id,
     slug: event.slug,
     title: event.title,
+    summary: event.summary || "",
     host: event.host,
     category: event.category,
     startsAt: event.startsAt,
     schedulePrecision: event.schedulePrecision,
     venue: event.venue,
-    area: event.area,
-    languages: [...event.languages],
     ticketTiers: event.ticketTiers.map((tier) => ({ ...tier })),
     image: event.image,
     gallery: [...event.gallery],
@@ -105,13 +103,8 @@ export default function AdminEventsPage() {
   const saveSettingsMutation = useSaveSiteSettingsMutation();
   const content = settingsQuery.data?.content;
   const featuredSlug = content?.featuredEventId || "";
-  const configuredAreas = parseEventAreas(content?.eventAreas || "");
   const cityName = content?.cityName || "Abuja";
   const events = eventsQuery.data ?? [];
-  const areaOptions = [...configuredAreas, ...events.map((event) => event.area)]
-    .map((area) => area.trim())
-    .filter((area, index, list) => Boolean(area) && list.findIndex((item) => item.toLowerCase() === area.toLowerCase()) === index);
-  const defaultArea = areaOptions[0] || cityName;
   const [draft, setDraft] = useState<EventDraft | null>(null);
   const [galleryUrl, setGalleryUrl] = useState("");
   const [uploadError, setUploadError] = useState("");
@@ -151,13 +144,14 @@ export default function AdminEventsPage() {
         id: draft.id,
         slug: draft.slug,
         title: draft.title,
+        summary: draft.summary,
         host: draft.host,
         category: draft.category,
         startsAt: draft.startsAt,
         schedulePrecision: draft.schedulePrecision,
         venue: draft.venue,
-        area: draft.area,
-        languages: draft.languages,
+        area: "",
+        languages: [],
         image: draft.image,
         gallery: draft.gallery,
         label: draft.label,
@@ -202,7 +196,7 @@ export default function AdminEventsPage() {
           <h1 className="mt-1 text-3xl font-bold tracking-tight">Events & tickets</h1>
           <p className="mt-2 text-xs text-muted-foreground">Events, tiers and galleries save to Supabase and power public checkout.</p>
         </div>
-        <Button onClick={() => { setDraft(newEvent(cityName, defaultArea)); saveMutation.reset(); setFormError(""); }}><Plus size={14} /> Create event</Button>
+        <Button onClick={() => { setDraft(newEvent(cityName)); saveMutation.reset(); setFormError(""); }}><Plus size={14} /> Create event</Button>
       </div>
 
       {(eventsQuery.error || settingsQuery.error) && (
@@ -260,7 +254,7 @@ export default function AdminEventsPage() {
                 <span className="size-12 shrink-0 border border-foreground bg-cover bg-center" style={{ backgroundImage: event.image ? `url("${event.image}")` : undefined }} />
                 <span className="min-w-0 flex-1">
                   <strong className="block truncate text-xs">{event.title}</strong>
-                  <span className="mt-1 block truncate text-[9px] text-muted-foreground">{event.dateShort} · {event.area} · {event.status}{featuredSlug === event.slug ? " · THIS WEEK'S PICK" : ""}</span>
+                  <span className="mt-1 block truncate text-[9px] text-muted-foreground">{event.dateShort} · {event.status}{featuredSlug === event.slug ? " · THIS WEEK'S PICK" : ""}</span>
                   <span className="mt-1 block text-[9px]">from {formatNaira(event.ticketTiers.length ? Math.min(...event.ticketTiers.map((tier) => tier.price)) : 0)}</span>
                 </span>
               </button>
@@ -300,6 +294,7 @@ export default function AdminEventsPage() {
                 <h3 className="text-xs font-bold">Basics</h3>
                 <div className="grid gap-3 sm:grid-cols-2">
                   <label className="grid gap-1 text-[10px] font-semibold sm:col-span-2">Experience title<Input required value={draft.title} onChange={(event) => updateDraft("title", event.target.value)} /></label>
+                  <label className="grid gap-1 text-[10px] font-semibold sm:col-span-2">Description *<Textarea required rows={5} value={draft.summary} onChange={(event) => updateDraft("summary", event.target.value)} placeholder="What this experience offers…" /></label>
                   <label className="grid gap-1 text-[10px] font-semibold">Host<Input value={draft.host} onChange={(event) => updateDraft("host", event.target.value)} /></label>
                   <label className="grid gap-1 text-[10px] font-semibold">Category<Input required value={draft.category} onChange={(event) => updateDraft("category", event.target.value)} placeholder="e.g. French conversation" /></label>
                   <label className="grid gap-1 text-[10px] font-semibold">Schedule<select className="h-10 border-2 border-input bg-card px-2 text-xs" value={draft.schedulePrecision} onChange={(event) => {
@@ -334,9 +329,7 @@ export default function AdminEventsPage() {
                     </Button>
                     <p className="mt-1 text-[9px] text-muted-foreground">Controls the large “THIS WEEK'S PICK” card on the homepage.</p>
                   </div>
-                  <label className="grid gap-1 text-[10px] font-semibold">Area<Input required list="event-area-suggestions" value={draft.area} onChange={(event) => updateDraft("area", event.target.value)} placeholder="e.g. Maitama" /><datalist id="event-area-suggestions">{areaOptions.map((area) => <option key={area} value={area} />)}</datalist></label>
                   <label className="grid gap-1 text-[10px] font-semibold sm:col-span-2">Venue<Input value={draft.venue} onChange={(event) => updateDraft("venue", event.target.value)} /></label>
-                  <label className="grid gap-1 text-[10px] font-semibold sm:col-span-2">Languages, separated by commas<Input value={draft.languages.join(", ")} onChange={(event) => updateDraft("languages", event.target.value.split(",").map((language) => language.trim()).filter(Boolean))} /></label>
                   <label className="grid gap-1 text-[10px] font-semibold">Listing tag<Input placeholder="Optional" value={draft.label} onChange={(event) => updateDraft("label", event.target.value)} /></label>
                 </div>
               </section>
@@ -416,7 +409,7 @@ export default function AdminEventsPage() {
                 <CalendarDays className="mx-auto text-muted-foreground" />
                 <p className="mt-3 text-xs font-semibold">Choose an event to edit</p>
                 <p className="mt-1 text-[10px] text-muted-foreground">Or create a meetup for your community.</p>
-                <Button className="mt-4" size="sm" onClick={() => setDraft(newEvent(cityName, defaultArea))}><Plus size={14} /> Create event</Button>
+                <Button className="mt-4" size="sm" onClick={() => setDraft(newEvent(cityName))}><Plus size={14} /> Create event</Button>
               </div>
             </div>
           )}

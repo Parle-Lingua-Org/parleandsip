@@ -52,7 +52,9 @@ function readSavedData(): SiteData {
       footerLocation: "LAGOS, NIGERIA",
     };
     for (const key of Object.keys(legacyContent) as Array<keyof SiteContent>) {
-      if (parsed.content?.[key] === legacyContent[key]) content[key] = initialSiteData.content[key];
+      if (parsed.content?.[key] === legacyContent[key]) {
+        Object.assign(content, { [key]: initialSiteData.content[key] });
+      }
     }
     if (!content.cityName || /lagos/i.test(content.cityName)) content.cityName = initialSiteData.content.cityName;
     if (!content.areaFilterAll || /lagos/i.test(content.areaFilterAll)) content.areaFilterAll = initialSiteData.content.areaFilterAll;

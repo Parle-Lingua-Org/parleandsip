@@ -4,6 +4,7 @@ import { useState, type ReactNode } from "react";
 import { ArrowDownRight, ArrowRight, MapPin, Menu, X } from "lucide-react";
 import { BrandLogo } from "@/components/site/brand-logo";
 import { CommunityRsvpForm } from "@/components/site/community-rsvp-form";
+import { SiteFooter } from "@/components/site/site-footer";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import type { SiteContent } from "@/lib/site-data";
@@ -11,7 +12,7 @@ import type { SiteContent } from "@/lib/site-data";
 type SiteChromeProps = {
   content: SiteContent;
   children: ReactNode;
-  active?: "home" | "events" | "about" | "contact";
+  active?: "home" | "events" | "about" | "contact" | "policies";
 };
 
 export function SiteChrome({ content, children, active = "home" }: SiteChromeProps) {
@@ -45,16 +46,7 @@ export function SiteChrome({ content, children, active = "home" }: SiteChromePro
 
       {children}
 
-      <div className="mx-auto max-w-[1200px] px-4 sm:px-8">
-        <footer className="mt-10 flex min-h-20 flex-wrap items-center gap-3 border-t-2 border-foreground py-4">
-          <a className="flex items-center gap-2 text-lg font-bold" href="/">
-            <BrandLogo size={28} />
-            {content.brandName}<span className="text-accent">.</span>
-          </a>
-          <p className="font-serif text-xs italic text-muted-foreground">{content.footerText}</p>
-          <span className="ml-auto text-right font-mono text-[8px] tracking-wide text-muted-foreground">{content.footerLocation} <span className="px-1 text-accent">●</span> {content.footerCurrency}</span>
-        </footer>
-      </div>
+      <SiteFooter content={content} />
 
       <Dialog open={createFormOpen} onOpenChange={setCreateFormOpen}>
         <DialogContent className="max-w-3xl overflow-hidden p-0">

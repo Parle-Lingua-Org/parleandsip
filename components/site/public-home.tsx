@@ -31,6 +31,7 @@ import { remainingForTier, upcomingEvents, type EventRecord } from "@/lib/events
 import { formatNaira, initialSiteData } from "@/lib/site-data";
 import { BrandLogo } from "@/components/site/brand-logo";
 import { CommunityRsvpForm } from "@/components/site/community-rsvp-form";
+import { SiteFooter } from "@/components/site/site-footer";
 
 export function PublicHome() {
   const settingsQuery = useSiteSettingsQuery();
@@ -64,7 +65,7 @@ export function PublicHome() {
   const nextEditions = upcomingEvents(events, 3);
   const visibleEvents = events.filter((event) => {
     if (!query.trim()) return true;
-    return `${event.title} ${event.host} ${event.category} ${event.venue} ${event.area} ${event.languages.join(" ")}`.toLowerCase().includes(query.trim().toLowerCase());
+    return `${event.title} ${event.host} ${event.category} ${event.venue} ${event.summary}`.toLowerCase().includes(query.trim().toLowerCase());
   });
   const selectedTier = selectedEvent?.ticketTiers.find((tier) => tier.id === selectedTierId) ?? selectedEvent?.ticketTiers[0];
   const eventImages = selectedEvent ? [selectedEvent.image, ...selectedEvent.gallery].filter((image, index, list) => Boolean(image) && list.indexOf(image) === index) : [];
@@ -163,7 +164,7 @@ export function PublicHome() {
             {featuredEvent && (featuredEvent.image || content.heroImage) && <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `linear-gradient(180deg,rgb(var(--dap-overlay-rgb)/.04) 18%,rgb(var(--dap-overlay-rgb)/.78) 100%),url("${featuredEvent.image || content.heroImage}")` }} />}
             <Badge className="absolute left-4 top-4 gap-1.5"><Sparkles size={12} /> THIS WEEK&apos;S PICK</Badge>
             <div className="absolute inset-x-4 bottom-4 sm:inset-x-5 sm:bottom-5">
-              <p className="font-mono text-[9px] uppercase tracking-wide text-dap-feature-copy">{featuredEvent?.category ?? "Community meetup"} <span className="px-1 text-primary">·</span> {featuredEvent?.area ?? content.cityName}</p>
+              <p className="font-mono text-[9px] uppercase tracking-wide text-dap-feature-copy">{featuredEvent?.category ?? "Community meetup"}{featuredEvent?.venue ? <> <span className="px-1 text-primary">·</span> {featuredEvent.venue}</> : null}</p>
               <h2 className="mt-2 text-3xl font-bold leading-tight">{featuredEvent?.title ?? "Your next conversation starts here"}</h2>
               <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
                 <span className="flex items-center gap-1.5 font-mono text-[9px]"><CalendarDays size={14} /> {featuredEvent ? (featuredEvent.time ? `${featuredEvent.dateShort} · ${featuredEvent.time}` : featuredEvent.dateShort) : "TBD"}</span>
@@ -230,8 +231,8 @@ export function PublicHome() {
                     <p className="font-mono text-[8px] uppercase text-muted-foreground">{event.category}</p>
                     <h3 className="mt-1 min-h-9 text-sm font-bold leading-tight">{event.title}</h3>
                     <p className="mt-1 flex items-start gap-1 text-[10px] text-muted-foreground"><MapPin size={13} className="mt-0.5 shrink-0" />{event.venue} <span className="text-dap-text-soft">· {event.host}</span></p>
-                    <div className="flex min-h-9 flex-wrap content-center gap-1.5 py-2">{event.languages.map((language) => <Badge key={language} variant="outline" className="border-dap-border-soft px-1.5 py-0.5 text-[8px]">{language}</Badge>)}</div>
-                    <div className="flex min-h-9 items-center justify-between gap-2 border-t border-dap-border-soft pt-2"><span className="flex items-center gap-1 text-[9px] text-muted-foreground"><Clock3 size={13} />{event.time}</span><Button variant="ghost" size="sm" onClick={() => openTickets(event)}>from {formatNaira(Math.min(...event.ticketTiers.map((tier) => tier.price)))} <ArrowRight size={13} /></Button></div>
+                    {event.summary ? <p className="mt-2 line-clamp-2 text-[10px] leading-5 text-muted-foreground">{event.summary}</p> : null}
+                    <div className="mt-2 flex min-h-9 items-center justify-between gap-2 border-t border-dap-border-soft pt-2"><span className="flex items-center gap-1 text-[9px] text-muted-foreground"><Clock3 size={13} />{event.time || event.dateShort}</span><Button variant="ghost" size="sm" onClick={() => openTickets(event)}>from {formatNaira(Math.min(...event.ticketTiers.map((tier) => tier.price)))} <ArrowRight size={13} /></Button></div>
                   </div>
                 </Card>
               ))}
@@ -282,12 +283,8 @@ export function PublicHome() {
           </div>
         </section>
 
-        <footer className="mt-10 flex min-h-20 flex-wrap items-center gap-3 border-t-2 border-foreground py-4">
-          <a className="flex items-center gap-2 text-lg font-bold" href="#top"><BrandLogo size={28} />{content.brandName}<span className="text-accent">.</span></a>
-          <p className="font-serif text-xs italic text-muted-foreground">{content.footerText}</p>
-          <span className="ml-auto text-right font-mono text-[8px] tracking-wide text-muted-foreground">{content.footerLocation} <span className="px-1 text-accent">●</span> {content.footerCurrency}</span>
-        </footer>
       </div>
+      <SiteFooter content={content} />
 
       <Dialog open={createFormOpen} onOpenChange={setCreateFormOpen}>
         <DialogContent className="max-w-3xl overflow-hidden p-0">
@@ -404,7 +401,8 @@ export function PublicHome() {
             <span className="mx-auto grid size-11 place-items-center border-2 border-foreground bg-primary"><Ticket size={21} /></span><p className="mt-4 font-mono text-[9px] text-muted-foreground">SECURE PAYSTACK CHECKOUT</p><DialogTitle className="mt-1 text-2xl font-bold">Complete your booking.</DialogTitle><DialogDescription className="mx-auto mt-2 max-w-xs text-xs leading-5 text-muted-foreground">Your ticket is reserved while Paystack confirms payment. We&apos;ll email the QR ticket after confirmation.</DialogDescription>
             <div className="my-5 flex justify-between border-y border-dap-border-muted py-3 text-sm"><span>Order total</span><strong>{formatNaira(ticketPrice * quantity)}</strong></div><Button asChild className="w-full"><a href={checkoutUrl}>Continue to Paystack <ArrowRight size={15} /></a></Button>
           </div> : <form className="space-y-4 p-4 sm:p-5" onSubmit={submitCheckout}>
-            <div><p className="font-mono text-[8px] uppercase text-muted-foreground">{selectedEvent.category} · {selectedEvent.area}</p><DialogTitle className="mt-1 pr-9 text-xl font-bold leading-tight">{selectedEvent.title}</DialogTitle><DialogDescription className="mt-1 flex items-center gap-1 text-[10px] text-muted-foreground"><MapPin size={13} />{selectedEvent.venue}</DialogDescription></div>
+            <div><p className="font-mono text-[8px] uppercase text-muted-foreground">{selectedEvent.category}</p><DialogTitle className="mt-1 pr-9 text-xl font-bold leading-tight">{selectedEvent.title}</DialogTitle><DialogDescription className="mt-1 flex items-center gap-1 text-[10px] text-muted-foreground"><MapPin size={13} />{selectedEvent.venue}</DialogDescription></div>
+            {selectedEvent.summary ? <p className="text-[11px] leading-5 text-muted-foreground">{selectedEvent.summary}</p> : null}
             <fieldset><legend className="mb-2 font-mono text-[8px] text-muted-foreground">PICK YOUR PASS</legend><div className="grid gap-2">
               {selectedEvent.ticketTiers.map((tier) => { const remaining = tierRemaining(selectedEvent, tier.id); return <button key={tier.id} type="button" disabled={remaining === 0} aria-pressed={selectedTier?.id === tier.id} onClick={() => { setSelectedTierId(tier.id); setQuantity((count) => Math.min(count, Math.max(remaining, 1))); setOrderError(""); }} className={`flex min-h-14 items-center gap-3 border-2 px-3 text-left disabled:cursor-not-allowed disabled:opacity-50 ${selectedTier?.id === tier.id ? "border-foreground bg-success shadow-[2px_2px_0_var(--foreground)]" : "border-dap-border-muted bg-card"}`}><span className="grid size-4 place-items-center rounded-full border border-foreground">{selectedTier?.id === tier.id && <span className="size-2 rounded-full bg-foreground" />}</span><span className="flex-1"><strong className="block text-[10px]">{tier.name}</strong><small className="text-[9px] text-muted-foreground">{tier.description} · {remaining ? `${remaining} left` : "Sold out"}</small></span><strong className="text-xs">{formatNaira(tier.price)}</strong></button>; })}
             </div></fieldset>
@@ -413,6 +411,13 @@ export function PublicHome() {
             <div className="flex items-center justify-between text-xs"><span>Total <small className="text-[9px] text-muted-foreground"> · fees at checkout</small></span><strong className="text-base">{formatNaira(ticketPrice * quantity)}</strong></div>
             {orderError && <p role="alert" className="text-[10px] text-accent-foreground">{orderError}</p>}
             <Button className="w-full" type="submit" disabled={selectedTierRemaining === 0 || checkoutBusy}>{checkoutBusy ? "Opening Paystack…" : selectedTierRemaining ? "Continue to Paystack" : "Sold out"} <ArrowRight size={15} /></Button>
+            <p className="text-center text-[9px] leading-5 text-muted-foreground">
+              By purchasing, you agree to our{" "}
+              <a className="font-semibold underline" href="/policies#refund-cancellation" target="_blank" rel="noreferrer">
+                Refund, cancellation &amp; payment terms
+              </a>
+              .
+            </p>
             <p className="text-center text-[8px] text-muted-foreground">Secure hosted payment · ticket QR emailed after confirmation</p>
           </form>}
         </DialogContent>}

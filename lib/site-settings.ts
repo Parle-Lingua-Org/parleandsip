@@ -1,7 +1,7 @@
 import "server-only";
 
 import { createAdminClient } from "@/lib/supabase/admin";
-import { initialSiteData, type SiteContent, type SiteTheme } from "@/lib/site-data";
+import { initialSiteData, type FaqItem, type SiteContent, type SiteTheme } from "@/lib/site-data";
 import { defaultTicketTemplate, normalizeTicketTemplate, type TicketTemplate } from "@/lib/ticket-pdf-shared";
 
 export type SiteSettingsPayload = {
@@ -14,8 +14,27 @@ function asObject(value: unknown) {
   return value && typeof value === "object" ? (value as Record<string, unknown>) : {};
 }
 
+function normalizeFaqItems(value: unknown, fallback: FaqItem[]): FaqItem[] {
+  if (!Array.isArray(value)) return fallback;
+  const items = value
+    .map((item) => {
+      if (!item || typeof item !== "object") return null;
+      const row = item as Record<string, unknown>;
+      const question = typeof row.question === "string" ? row.question.trim() : "";
+      const answer = typeof row.answer === "string" ? row.answer.trim() : "";
+      if (!question && !answer) return null;
+      return { question, answer };
+    })
+    .filter((item): item is FaqItem => Boolean(item));
+  return items.length ? items : fallback;
+}
+
 export function normalizeSiteContent(value: unknown): SiteContent {
-  return { ...initialSiteData.content, ...asObject(value) } as SiteContent;
+  const raw = asObject(value);
+  const merged = { ...initialSiteData.content, ...raw } as SiteContent;
+  merged.aboutFaq = normalizeFaqItems(raw.aboutFaq, initialSiteData.content.aboutFaq);
+  merged.policiesFaq = normalizeFaqItems(raw.policiesFaq, initialSiteData.content.policiesFaq);
+  return merged;
 }
 
 export function normalizeSiteTheme(value: unknown): SiteTheme {

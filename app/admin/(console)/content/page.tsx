@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, type FormEvent } from "react";
-import { Check, Palette, Save, Sparkles } from "lucide-react";
+import { Check, Palette, Plus, Save, Sparkles, Trash2 } from "lucide-react";
 import { BrandLogo } from "@/components/site/brand-logo";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAdminEventsQuery, useSaveSiteSettingsMutation, useSiteSettingsQuery } from "@/hooks/use-site-data";
-import { initialSiteData, type SiteContent, type SiteTheme } from "@/lib/site-data";
+import { initialSiteData, type FaqItem, type SiteContent, type SiteTheme } from "@/lib/site-data";
 
 const themeFields: { key: keyof SiteTheme; label: string; note: string }[] = [
   { key: "background", label: "Page background", note: "Main canvas" },
@@ -39,10 +39,57 @@ const contentSections: { title: string; description: string; fields: { key: keyo
   { title: "Contact us page", description: "Intro copy for /contact. Contact details below still drive the cards and form.", fields: [{ key: "contactPageEyebrow", label: "Eyebrow" }, { key: "contactPageTitle", label: "Page title" }, { key: "contactPageDescription", label: "Intro description", multiline: true }] },
   { title: "Bento sections", description: "The supporting homepage panels.", fields: [{ key: "promptTitle", label: "Prompt heading" }, { key: "promptEmphasis", label: "Prompt emphasis" }, { key: "promptCaption", label: "Prompt caption" }, { key: "calendarTitle", label: "Calendar panel title" }, { key: "communityTitle", label: "Community panel headline", multiline: true }, { key: "communityCta", label: "Community link label" }] },
   { title: "Meetups & language pros", description: "Section labels and host callout.", fields: [{ key: "eventsEyebrow", label: "Meetups eyebrow" }, { key: "eventsTitle", label: "Meetups headline" }, { key: "eventsEmphasis", label: "Meetups headline emphasis" }, { key: "proEyebrow", label: "Language pros eyebrow" }, { key: "proTitle", label: "Language pros headline" }, { key: "proEmphasis", label: "Language pros emphasis" }, { key: "proDescription", label: "Language pros description", multiline: true }, { key: "proCta", label: "Join community button label" }] },
-  { title: "City & areas", description: "Default city label and suggested areas for events.", fields: [{ key: "cityName", label: "City name" }, { key: "eventAreas", label: "Suggested event areas, separated by commas", multiline: true }, { key: "footerLocation", label: "Footer location label" }] },
+  { title: "Policies page", description: "Public /policies copy. Footer links jump to these sections.", fields: [{ key: "policiesTicketPurchase", label: "Ticket purchase", multiline: true }, { key: "policiesRefund", label: "Refund & cancellation policy", multiline: true }, { key: "policiesTicketTransfer", label: "Ticket transfer terms", multiline: true }, { key: "policiesDocumentUrl", label: "Optional policy document URL (PDF or page)" }] },
+  { title: "Location labels", description: "City and footer location labels.", fields: [{ key: "cityName", label: "City name" }, { key: "footerLocation", label: "Footer location label" }] },
   { title: "Contact & social", description: "Email, WhatsApp, Instagram and TikTok shown on Contact us and the homepage.", fields: [{ key: "contactEmail", label: "Contact email" }, { key: "contactWhatsapp", label: "WhatsApp number" }, { key: "instagramHandle", label: "Instagram username" }, { key: "tiktokHandle", label: "TikTok username" }] },
   { title: "Footer", description: "Footer content shown on every public page.", fields: [{ key: "footerText", label: "Footer tagline" }, { key: "footerCurrency", label: "Currency label" }] },
 ];
+
+function FaqEditor({
+  title,
+  description,
+  items,
+  onChange,
+}: {
+  title: string;
+  description: string;
+  items: FaqItem[];
+  onChange: (items: FaqItem[]) => void;
+}) {
+  return (
+    <Card className="p-4 shadow-[4px_4px_0_var(--foreground)] sm:p-6">
+      <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className="text-base font-bold">{title}</h2>
+          <p className="mt-1 text-[10px] text-muted-foreground">{description}</p>
+        </div>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => {
+            onChange([...items, { question: "", answer: "" }]);
+          }}
+        >
+          <Plus size={13} /> Add question
+        </Button>
+      </div>
+      <div className="space-y-3">
+        {items.map((item, index) => (
+          <div key={index} className="grid gap-2 border border-dap-border-muted p-3 sm:grid-cols-[1fr_36px]">
+            <div className="grid gap-2">
+              <label className="grid gap-1 text-[10px] font-semibold">Question<Input value={item.question} onChange={(event) => onChange(items.map((row, rowIndex) => rowIndex === index ? { ...row, question: event.target.value } : row))} /></label>
+              <label className="grid gap-1 text-[10px] font-semibold">Answer<Textarea rows={3} value={item.answer} onChange={(event) => onChange(items.map((row, rowIndex) => rowIndex === index ? { ...row, answer: event.target.value } : row))} /></label>
+            </div>
+            <Button type="button" variant="ghost" size="icon" aria-label="Remove FAQ item" disabled={items.length <= 1} onClick={() => onChange(items.filter((_, rowIndex) => rowIndex !== index))}>
+              <Trash2 size={14} />
+            </Button>
+          </div>
+        ))}
+      </div>
+    </Card>
+  );
+}
 
 export default function AdminContentPage() {
   const settingsQuery = useSiteSettingsQuery();
@@ -117,8 +164,25 @@ export default function AdminContentPage() {
         <div className="mb-5"><h2 className="text-base font-bold">{section.title}</h2><p className="mt-1 text-[10px] text-muted-foreground">{section.description}</p></div>
         {section.title === "Hero" && <div className="mb-5 grid gap-5 lg:grid-cols-[minmax(0,1.1fr)_minmax(260px,.9fr)]"><div className="grid content-start gap-3"><ImagePicker label="Featured hero image" value={contentDraft.heroImage} onChange={(value) => updateContentField("heroImage", value)} /></div><label className="grid content-start gap-1.5 text-[10px] font-semibold">Featured event<select className="h-10 border-2 border-input bg-card px-3 text-xs" value={contentDraft.featuredEventId} onChange={(event) => updateContentField("featuredEventId", event.target.value)}>{events.map((item) => <option key={item.id} value={item.slug}>{item.title}</option>)}</select><span className="text-[9px] font-normal text-muted-foreground">Uses the event slug for the featured title and ticket action.</span></label></div>}
         {section.title === "About us page" && <div className="mb-5"><ImagePicker label="About page image" value={contentDraft.aboutImage} onChange={(value) => updateContentField("aboutImage", value)} /></div>}
-        <div className="grid gap-x-4 gap-y-4 sm:grid-cols-2">{section.fields.map(({ key, label, multiline }) => <label key={key} className={`grid gap-1.5 text-[10px] font-semibold ${multiline ? "sm:col-span-2" : ""}`}>{label}{multiline ? <Textarea rows={key === "aboutBody" ? 6 : 2} value={contentDraft[key]} onChange={(event) => updateContentField(key, event.target.value)} /> : <Input value={contentDraft[key]} onChange={(event) => updateContentField(key, event.target.value)} />}</label>)}</div>
+        <div className="grid gap-x-4 gap-y-4 sm:grid-cols-2">{section.fields.map(({ key, label, multiline }) => {
+          const value = contentDraft[key];
+          if (typeof value !== "string") return null;
+          return <label key={key} className={`grid gap-1.5 text-[10px] font-semibold ${multiline ? "sm:col-span-2" : ""}`}>{label}{multiline ? <Textarea rows={key === "aboutBody" || key.startsWith("policies") ? 5 : 2} value={value} onChange={(event) => updateContentField(key, event.target.value)} /> : <Input value={value} onChange={(event) => updateContentField(key, event.target.value)} />}</label>;
+        })}</div>
       </Card>)}
+
+      <FaqEditor
+        title="About us FAQ"
+        description="Shown on /about under the story. Add, edit or remove Q&As."
+        items={contentDraft.aboutFaq?.length ? contentDraft.aboutFaq : [{ question: "", answer: "" }]}
+        onChange={(items) => updateContentField("aboutFaq", items)}
+      />
+      <FaqEditor
+        title="Policies FAQ"
+        description="Shown on /policies#faq."
+        items={contentDraft.policiesFaq?.length ? contentDraft.policiesFaq : [{ question: "", answer: "" }]}
+        onChange={(items) => updateContentField("policiesFaq", items)}
+      />
 
       <Card className="p-4 shadow-[4px_4px_0_var(--foreground)] sm:p-6">
         <div className="mb-5 flex items-start gap-3"><span className="grid size-9 place-items-center border-2 border-foreground bg-primary"><Palette size={17} /></span><div><h2 className="font-bold">Global palette</h2><p className="mt-1 text-[10px] text-muted-foreground">Start with a palette, then tune individual semantic colors.</p></div></div>

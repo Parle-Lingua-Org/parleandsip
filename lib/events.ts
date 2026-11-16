@@ -79,6 +79,7 @@ export async function saveEvent(input: EventSaveInput, createdBy?: string | null
     }
   }
   if (!input.title.trim()) throw new Error("Event title is required.");
+  if (!(input.summary || "").trim()) throw new Error("Event description is required.");
   if (!input.ticketTiers.length) throw new Error("Add at least one ticket type.");
 
   const desiredSlug = slugify(input.slug || input.title);
@@ -94,8 +95,8 @@ export async function saveEvent(input: EventSaveInput, createdBy?: string | null
     schedule_precision: precision,
     venue_name: input.venue.trim(),
     address: input.venue.trim(),
-    area: input.area.trim(),
-    language_tags: input.languages,
+    area: (input.area || "").trim(),
+    language_tags: input.languages ?? [],
     main_image_url: input.image.trim(),
     listing_label: (input.label || "").trim(),
     status,
