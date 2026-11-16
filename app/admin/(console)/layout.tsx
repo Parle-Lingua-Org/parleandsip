@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { CalendarDays, ClipboardList, Eye, KeyRound, LayoutDashboard, LockKeyhole, LogOut, Palette, ScanLine, Shield, Stamp, Ticket } from "lucide-react";
@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useSiteSettingsQuery } from "@/hooks/use-site-data";
+import { PIN_COOKIE_TTL_MS } from "@/lib/admin-pin-client";
 import { initialSiteData } from "@/lib/site-data";
 import { notifyError } from "@/lib/notify";
 
@@ -25,6 +26,8 @@ const navigation = [
   { href: "/admin/pin", label: "Change PIN", icon: Shield },
 ];
 
+const PIN_TOUCH_THROTTLE_MS = 60_000;
+
 export default function AdminLayout({ children }: { children: ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -32,9 +35,12 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
   const content = settingsQuery.data?.content ?? initialSiteData.content;
   const [authorized, setAuthorized] = useState(false);
   const [pinUnlocked, setPinUnlocked] = useState(false);
+  const [pinLockedByIdle, setPinLockedByIdle] = useState(false);
   const [adminEmail, setAdminEmail] = useState("");
   const [pin, setPin] = useState("");
   const [pinBusy, setPinBusy] = useState(false);
+  const lastTouchAt = useRef(0);
+  const idleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -58,6 +64,55 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
     return () => { active = false; };
   }, [router]);
 
+  useEffect(() => {
+    if (!authorized || !pinUnlocked) return;
+
+    async function lockForInactivity() {
+      setPinUnlocked(false);
+      setPinLockedByIdle(true);
+      try {
+        await fetch("/api/admin/pin/lock", { method: "POST" });
+      } catch {
+        // Cookie may already be expired; UI is locked either way.
+      }
+    }
+
+    function scheduleIdleLock() {
+      if (idleTimer.current) clearTimeout(idleTimer.current);
+      idleTimer.current = setTimeout(() => {
+        void lockForInactivity();
+      }, PIN_COOKIE_TTL_MS);
+    }
+
+    async function noteActivity() {
+      scheduleIdleLock();
+      const now = Date.now();
+      if (now - lastTouchAt.current < PIN_TOUCH_THROTTLE_MS) return;
+      lastTouchAt.current = now;
+      try {
+        const response = await fetch("/api/admin/pin/touch", { method: "POST" });
+        if (response.status === 403) {
+          setPinUnlocked(false);
+          setPinLockedByIdle(true);
+        }
+      } catch {
+        // Keep local unlock; next idle lock or API call will re-check.
+      }
+    }
+
+    scheduleIdleLock();
+    const events: Array<keyof WindowEventMap> = ["pointerdown", "keydown", "mousemove", "scroll", "touchstart", "visibilitychange"];
+    const onActivity = () => {
+      if (document.visibilityState === "hidden") return;
+      void noteActivity();
+    };
+    for (const event of events) window.addEventListener(event, onActivity, { passive: true });
+    return () => {
+      if (idleTimer.current) clearTimeout(idleTimer.current);
+      for (const event of events) window.removeEventListener(event, onActivity);
+    };
+  }, [authorized, pinUnlocked]);
+
   async function signOut() {
     await fetch("/api/admin/logout", { method: "POST" });
     router.replace("/admin/login");
@@ -75,7 +130,9 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
       const result = await response.json() as { error?: string };
       if (!response.ok) throw new Error(result.error ?? "Incorrect PIN.");
       setPin("");
+      setPinLockedByIdle(false);
       setPinUnlocked(true);
+      lastTouchAt.current = 0;
     } catch (reason) {
       notifyError(reason, "Incorrect PIN.");
     } finally {
@@ -93,11 +150,14 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
             <span className="grid size-11 place-items-center border-2 border-foreground bg-primary"><LockKeyhole size={20} /></span>
             <div>
               <p className="font-mono text-[9px] tracking-wide text-muted-foreground">ADMIN PIN</p>
-              <h1 className="text-xl font-bold">Enter workspace PIN</h1>
+              <h1 className="text-xl font-bold">{pinLockedByIdle ? "PIN required again" : "Enter workspace PIN"}</h1>
             </div>
           </div>
           <p className="text-xs leading-5 text-muted-foreground">
-            Signed in as <strong>{adminEmail}</strong>. Enter the 6-digit PIN to open the admin console.
+            Signed in as <strong>{adminEmail}</strong>.{" "}
+            {pinLockedByIdle
+              ? "Locked after 10 minutes of inactivity — enter the PIN to continue (you are still signed in)."
+              : "Enter the 6-digit PIN to open the admin console."}
           </p>
           <form className="grid gap-3" onSubmit={(event) => void unlockWithPin(event)}>
             <label className="grid gap-1.5 text-xs font-semibold">

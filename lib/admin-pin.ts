@@ -7,7 +7,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 
 export const DEFAULT_ADMIN_PIN = "085213";
 export const ADMIN_PIN_COOKIE = "pas_admin_pin";
-const PIN_COOKIE_TTL_MS = 12 * 60 * 60 * 1000;
+/** PIN unlock expires after this much idle time (not a full logout). */
+export const PIN_COOKIE_TTL_MS = 10 * 60 * 1000;
 const OTP_TTL_MS = 10 * 60 * 1000;
 
 function cookieSecret() {
