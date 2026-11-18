@@ -101,15 +101,17 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
     }
 
     scheduleIdleLock();
-    const events: Array<keyof WindowEventMap> = ["pointerdown", "keydown", "mousemove", "scroll", "touchstart", "visibilitychange"];
+    const events: Array<keyof WindowEventMap> = ["pointerdown", "keydown", "mousemove", "scroll", "touchstart"];
     const onActivity = () => {
       if (document.visibilityState === "hidden") return;
       void noteActivity();
     };
     for (const event of events) window.addEventListener(event, onActivity, { passive: true });
+    document.addEventListener("visibilitychange", onActivity);
     return () => {
       if (idleTimer.current) clearTimeout(idleTimer.current);
       for (const event of events) window.removeEventListener(event, onActivity);
+      document.removeEventListener("visibilitychange", onActivity);
     };
   }, [authorized, pinUnlocked]);
 
